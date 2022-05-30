@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import random
 import requests
 import os
 import sys
@@ -12,6 +13,20 @@ realm = 'us1' # change to reflect your SignalFx Realm
 
 load_dotenv() # load environment variables    
 app = Flask(__name__)
+
+
+def generate_username():
+    """
+    Generates a random username for the tweet.
+    """
+
+    with open('words.txt', 'r') as f:
+        words = f.readlines()
+        words = [word.strip() for word in words]
+        random_number = random.randint(0, len(words)-1)
+        username = words[random_number] + str(random_number)
+
+    return username
 
 
 # turn Tweets.txt into a list
@@ -39,7 +54,7 @@ def send_tweet():
     
     # sending tweets every 1.5 seconds
     for t in list_of_tweets:
-        tweet = "twitter: " + t
+        tweet = "twitter: " + t + " - " + "@" + generate_username()
 
         # SignalFx
         endpoint = f'https://ingest.{realm}.signalfx.com/v2/event'
