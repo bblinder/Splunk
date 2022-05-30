@@ -77,4 +77,4 @@ if not realm and not org_access_token:
     print('Please set your realm and org_access_token (either as an environment variable or in a .env file)')
     sys.exit(1)
 else:
-    app.run(host="0.0.0.0", port="8080", debug=True)
+    app.run(host="0.0.0.0", port="8080") # include "debug=True" if you need troubleshooting
