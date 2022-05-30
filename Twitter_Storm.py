@@ -17,17 +17,16 @@ app = Flask(__name__)
 # turn Tweets.txt into a list
 def read_tweets():
     """
-    Reads the tweets from the file and turns them into a list
+    Reads the tweets from the file and turns them into a list.
+    It turns them into single quotes for now, as for some reason
+    the SignalFx ingest API doesn't like double quotes.
     """
 
     with open('Tweets.txt', 'r') as f:
         list_of_tweets = f.readlines()
         # strip out apostrophes and convert to single quotes
-        list_of_tweets = [tweet.strip("'").replace("'", "") for tweet in list_of_tweets] # these need to be in single quotes for now, as for some reason 
+        list_of_tweets = [tweet.strip("'").replace("'", "") for tweet in list_of_tweets]
     return list_of_tweets
-
-
-#print((read_tweets()))
 
 
 def send_tweet():
