@@ -9,11 +9,14 @@ from time import sleep
 from flask import Flask, render_template, request
 from dotenv import load_dotenv
 
+load_dotenv() # load environment variables 
+
+
 realm = 'us1' # change to reflect your SignalFx Realm
+org_access_token = os.getenv('SIGNALFX_ORG_ACCESS_TOKEN')
+   
 
-load_dotenv() # load environment variables    
 app = Flask(__name__)
-
 
 def generate_username():
     """
@@ -58,7 +61,6 @@ def send_tweet():
 
         # SignalFx
         endpoint = f'https://ingest.{realm}.signalfx.com/v2/event'
-        org_access_token = os.getenv('SIGNALFX_ORG_ACCESS_TOKEN')
 
         # Set headers
         headers = {
@@ -87,8 +89,9 @@ def index():
     return "<h1>Tweets sent!</h1>"
 
 
-if not realm and not org_access_token:
-    print('Please set your realm and org_access_token (either as an environment variable or in a .env file)')
-    sys.exit(1)
+# don't run if org_access_token or realm is not set
+if org_access_token is None or realm is None:
+    print("You must set the org_access_token and realm environment variables.")
+    sys.exit()
 else:
     app.run(host="0.0.0.0", port="8080") # include "debug=True" if you need troubleshooting
