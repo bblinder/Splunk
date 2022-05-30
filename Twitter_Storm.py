@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+
 import random
 import requests
 import os, sys
@@ -8,33 +9,37 @@ from time import sleep
 from flask import Flask, render_template, request
 from dotenv import load_dotenv
 
-
-load_dotenv()
-    
 realm = 'us1' # change to reflect your SignalFx Realm
 
-
+load_dotenv() # load environment variables    
 app = Flask(__name__)
 
-# putting these in single quotes for now, as for some reason double quotes aren't working.
-list_of_tweets = [
-    'WTF is this? I cant order my special editions! #JustDoIt',
-    'Argh! Site is down again! #cantdoit',
-    'Lol did #JustDoIt hire the guys from Old Balance? Site is draaagggggging...',
-    'Im so happy I cant order my special editions! #JustDoIt"',
-    'OMG Im gonna miss my running club! #JustDoIt',
-    'Bought AdDDos instead #sandalscandal',
-    'Guess Im gonna have to set my bunions free. Major #JustDoIt fail',
-    'Γιατί δεν λειτουργεί ο ιστότοπος #JustDoIt fail!',
-    'Δεν λειτουργεί ο ιστότοπος #JustDoIt fail!',
-    'Im finally cutting out the logos out of my #JustDoIt pillow case!',
-    'What the hell, #JustDoIt! This is the 4th fail this month!',
-    'Tu terribilis es, #JustDoIt!',
-    'Non iterum! Ordinem meum addere non possum!'
-]
+
+# turn Tweets.txt into a list
+def read_tweets():
+    """
+    Reads the tweets from the file and turns them into a list
+    """
+
+    with open('Tweets.txt', 'r') as f:
+        list_of_tweets = f.readlines()
+        # strip out apostrophes and convert to single quotes
+        list_of_tweets = [tweet.strip("'").replace("'", "") for tweet in list_of_tweets] # these need to be in single quotes for now, as for some reason double quotes aren't working.
+    return list_of_tweets
+
+
+#print((read_tweets()))
+
 
 def send_tweet():
-# sending tweets every 1.5 seconds
+    """
+    Iterates through the list of tweets and sends them as custom events.
+    Be sure to change the realm to reflect your SignalFx Realm (us1, etc.)
+    """
+
+    list_of_tweets = read_tweets()
+    
+    # sending tweets every 1.5 seconds
     for t in list_of_tweets:
         tweet = "twitter: " + t
 
