@@ -11,24 +11,21 @@ from dotenv import load_dotenv
 
 load_dotenv() # load environment variables 
 
-
-realm = 'us1' # change to reflect your SignalFx Realm
+# Set realm and org_access_token in either the '.env' file or as environment variables
+realm = os.getenv('REALM') # change to reflect your SignalFx Realm
 org_access_token = os.getenv('SIGNALFX_ORG_ACCESS_TOKEN')
    
-
 app = Flask(__name__)
 
 def generate_username():
     """
     Generates a random username for the tweet.
     """
-
     with open('words.txt', 'r') as f:
         words = f.readlines()
         words = [word.strip() for word in words]
         random_number = random.randint(0, len(words)-1)
         username = words[random_number] + str(random_number)
-
     return username
 
 
@@ -39,7 +36,6 @@ def read_tweets():
     It turns them into single quotes for now, as for some reason
     the SignalFx ingest API doesn't like double quotes.
     """
-
     with open('Tweets.txt', 'r') as f:
         list_of_tweets = f.readlines()
         # strip out apostrophes and convert to single quotes
@@ -52,9 +48,7 @@ def send_tweet():
     Iterates through the list of tweets and sends them as custom events.
     Be sure to change the realm to reflect your SignalFx Realm (ex: us1, etc.)
     """
-
     list_of_tweets = read_tweets()
-    
     # sending tweets every 1.5 seconds
     for t in list_of_tweets:
         tweet = "twitter: " + t + " - " + "@" + generate_username()
@@ -68,7 +62,6 @@ def send_tweet():
             'X-SF-TOKEN': org_access_token
         }
 
-        print(tweet)
         data = [{
             "category": "USER_DEFINED",
             "eventType": tweet,
