@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-
-import random
 import requests
-import os, sys
+import os
+import sys
 from time import sleep
 from flask import Flask, render_template, request
 from dotenv import load_dotenv
@@ -24,7 +23,7 @@ def read_tweets():
     with open('Tweets.txt', 'r') as f:
         list_of_tweets = f.readlines()
         # strip out apostrophes and convert to single quotes
-        list_of_tweets = [tweet.strip("'").replace("'", "") for tweet in list_of_tweets] # these need to be in single quotes for now, as for some reason double quotes aren't working.
+        list_of_tweets = [tweet.strip("'").replace("'", "") for tweet in list_of_tweets] # these need to be in single quotes for now, as for some reason 
     return list_of_tweets
 
 
@@ -34,7 +33,7 @@ def read_tweets():
 def send_tweet():
     """
     Iterates through the list of tweets and sends them as custom events.
-    Be sure to change the realm to reflect your SignalFx Realm (us1, etc.)
+    Be sure to change the realm to reflect your SignalFx Realm (ex: us1, etc.)
     """
 
     list_of_tweets = read_tweets()
