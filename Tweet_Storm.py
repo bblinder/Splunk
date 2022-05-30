@@ -8,8 +8,8 @@ from time import sleep
 from flask import Flask, render_template, request
 from dotenv import load_dotenv
 
-if os.path.isfile('.env'):
-    load_dotenv()
+
+load_dotenv()
     
 realm = 'us1' # change to reflect your SignalFx Realm
 
