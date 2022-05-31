@@ -16,7 +16,7 @@ The script can be run locally or in a cloud instance. Update the [canary deploym
 ## Running the demo
 
 1. Run `python3 Twitter_Storm.py` to kick off the script.
-  - If running from a cloud instance, it's recommended you use `nohup` to separate the running script from your terminal process. This ensures that it continues running if you lose connection to your instance.
+     - If running from a cloud instance, it's recommended you use `nohup` to separate the running script from your terminal process. This ensures that it continues running if you lose connection to your instance.
 2. Note the IP and port it exposes (usually `127.0.0.1:8080`), though this can be a public-facing cloud instance.
 3. Open the URL in a browser, or use a GET request (`curl http://{URL_OF_ENDPOINT}:8080`) to trigger the tweet storm.
    - Optional: include the curl request as a line in the `canary.sh` script so it triggers as part of the CICD demo.
