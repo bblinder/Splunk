@@ -7,7 +7,7 @@ The script can be run locally or in a cloud instance. Update the [canary deploym
 ## Pre-work
 
 1. Retrieve your O11y cloud/SignalFx token. **Ensure it has ingest permissions.**
-1. Edit the `Tweets.txt` file to include the tweets you want to send. Some examples are included.
+1. Edit the `Tweets.txt` file to include the tweets you want to send (**one per line**). Some examples are included.
 2. Run `pip install -r requirements.txt` to ensure dependencies are met.
 3. Include `SIGNALFX_ORG_ACCESS_TOKEN` and `REALM` in either the `.env` file or as environmental variables
     - Ex: `export SIGNALFX_ORG_ACCESS_TOKEN=xxxx`
