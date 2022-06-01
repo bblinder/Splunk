@@ -84,7 +84,7 @@ def index():
 
 # don't run if org_access_token or realm is not set
 if org_access_token is None or realm is None:
-    print("You must set the org_access_token and realm environment variables.")
-    sys.exit()
+    print("You must set the org_access_token and realm. This can be done in the '.env' file or as environment variables.")
+    sys.exit(1)
 else:
     app.run(host="0.0.0.0", port="8080") # include "debug=True" if you need troubleshooting
