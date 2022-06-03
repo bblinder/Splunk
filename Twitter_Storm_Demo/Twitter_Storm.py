@@ -9,13 +9,14 @@ from time import sleep
 from flask import Flask, render_template, request
 from dotenv import load_dotenv
 
-load_dotenv() # load environment variables 
+load_dotenv()  # load environment variables
 
 # Set realm and org_access_token in either the '.env' file or as environment variables
-realm = os.getenv('REALM') # change to reflect your SignalFx Realm
+realm = os.getenv('REALM')  # change to reflect your SignalFx Realm
 org_access_token = os.getenv('SIGNALFX_ORG_ACCESS_TOKEN')
-   
+
 app = Flask(__name__)
+
 
 def generate_username():
     """
@@ -24,7 +25,7 @@ def generate_username():
     with open('words.txt', 'r') as f:
         words = f.readlines()
         words = [word.strip() for word in words]
-        random_number = random.randint(0, len(words)-1)
+        random_number = random.randint(0, len(words) - 1)
         username = words[random_number] + str(random_number)
     return username
 
@@ -49,7 +50,6 @@ def send_tweet():
     Be sure to change the realm to reflect your SignalFx Realm (ex: us1, etc.)
     """
     list_of_tweets = read_tweets()
-    # sending tweets every 1.5 seconds
     for t in list_of_tweets:
         tweet = "twitter: " + t + " - " + "@" + generate_username()
 
@@ -72,8 +72,9 @@ def send_tweet():
 
         print(data)
         r = requests.post(endpoint, headers=headers, json=data)
-        sleep(1.5)
-        print(r.status_code) # putting here for debugging purposes. Useful to see if you're getting any 'unauthorized' errors.
+        sleep(1)  # sending tweets every 1.5 seconds
+        # putting here for debugging purposes. Useful to see if you're getting any 'unauthorized' errors.
+        print(r.status_code)
 
 
 @app.route('/', methods=['GET'])
@@ -84,7 +85,8 @@ def index():
 
 # don't run if org_access_token or realm is not set
 if org_access_token is None or realm is None:
-    print("You must set the org_access_token and realm. This can be done in the '.env' file or as environment variables.")
+    print(
+        "You must set the org_access_token and realm. This can be done in the '.env' file or as environment variables.")
     sys.exit(1)
 else:
-    app.run(host="0.0.0.0", port="8080") # include "debug=True" if you need troubleshooting
+    app.run(host="0.0.0.0", port="8080")  # include "debug=True" if you need troubleshooting
