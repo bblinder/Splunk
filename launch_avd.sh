@@ -3,7 +3,14 @@
 # Programatically launching an emulated android device without the need for booting up Android Studio.
 # Assumes you have the Android SDK/platform tools installed alongside Android Studio.
 
-set -euo pipefail
+# This has only been tested on Mac OS.
+
+set -Eeuo pipefail
+
+if [ "$(uname)" != "Darwin" ]; then
+    echo "This script is only meant to be run on Mac OS."
+    exit 1
+fi
 
 android_SDK_directory="/Users/$(whoami)/Library/Android/sdk"
 

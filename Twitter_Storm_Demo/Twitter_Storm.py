@@ -6,7 +6,7 @@ import requests
 import os
 import sys
 from time import sleep
-from flask import Flask, render_template, request
+from flask import Flask
 from dotenv import load_dotenv
 
 load_dotenv()  # load environment variables
@@ -47,7 +47,7 @@ def read_tweets():
 def send_tweet():
     """
     Iterates through the list of tweets and sends them as custom events.
-    Be sure to change the realm to reflect your SignalFx Realm (ex: us1, etc.)
+    Be sure to change the realm to reflect your SignalFx Realm (ex: us0, us1, etc.)
     """
     list_of_tweets = read_tweets()
     for t in list_of_tweets:
@@ -72,7 +72,7 @@ def send_tweet():
 
         print(data)
         r = requests.post(endpoint, headers=headers, json=data)
-        sleep(1)  # sending tweets every 1.5 seconds
+        sleep(1)  # sending tweets every 1 second.
         # putting here for debugging purposes. Useful to see if you're getting any 'unauthorized' errors.
         print(r.status_code)
 
@@ -85,8 +85,8 @@ def index():
 
 # don't run if org_access_token or realm is not set
 if org_access_token is None or realm is None:
-    print(
-        "You must set the org_access_token and realm. This can be done in the '.env' file or as environment variables.")
+    print("You must set the org_access_token and realm.") 
+    print("This can be done in the '.env' file or as environment variables.")
     sys.exit(1)
 else:
     app.run(host="0.0.0.0", port="8080")  # include "debug=True" if you need troubleshooting
