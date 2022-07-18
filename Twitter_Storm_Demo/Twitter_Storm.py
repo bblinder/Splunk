@@ -50,8 +50,9 @@ def send_tweet():
     Be sure to change the realm to reflect your SignalFx Realm (ex: us0, us1, etc.)
     """
     list_of_tweets = read_tweets()
+    username = generate_username()
     for t in list_of_tweets:
-        tweet = "twitter: " + t + " - " + "@" + generate_username()
+        tweet = "twitter: " + t + " - " + "@" + username
 
         # SignalFx
         endpoint = f'https://ingest.{realm}.signalfx.com/v2/event'
