@@ -56,6 +56,8 @@ def IPaddresses():
         IPs = [IP.replace(',', '') for IP in IPs]
         IPs = [IP.replace('"', '') for IP in IPs]
         IPs = [IP.strip() for IP in IPs]
+    # sort IPs
+    IPs.sort()
     return IPs
 
 
@@ -65,6 +67,15 @@ def WriteCSV():
         writer.writerow(['Name', 'Email', 'IP address (EC2)', 'SSH Info', 'Password', 'Browser Access', 'Splunk Observability URL'])
         for i in range(len(full_names)):
             writer.writerow([full_names[i], emails[i], IPs[i], f"ssh ubuntu@{IPs[i]}", 'Observability2022!', f"http://{IPs[i]}:6501", f"http://app.{sfx_realm}.signalfx.com"])
+
+        
+        # Accounting for the remaining IPs
+        extra_IPs = len(IPs) - len(emails)
+        if extra_IPs > 0:
+            # add extra IPs to the end of the list
+            for i in range(extra_IPs):
+                writer.writerow(['', '', IPs[-1], f"ssh ubuntu@{IPs[-1]}", 'Observability2022!', f"http://{IPs[-1]}:6501", f"http://app.{sfx_realm}.signalfx.com"])
+                IPs.pop()
 
 
 if __name__ == '__main__':
