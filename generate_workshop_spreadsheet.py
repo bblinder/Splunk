@@ -7,10 +7,12 @@ import argparse
 argparser = argparse.ArgumentParser()
 argparser.add_argument('-e', '--emails', help='Text file containing email addresses, one per line')
 argparser.add_argument('-ip', '--ips', help='Text file containing EC2 IP addresses, one per line')
+argparser.add_argument('-r', '--realm', help='Splunk/SignalFX realm. Default: us1', required=False, default='us1')
 args = argparser.parse_args()
 
 email_list = args.emails
 ec2_ips = args.ips
+sfx_realm = args.realm
 
 
 def sort_emails(email_list):
@@ -62,7 +64,7 @@ def WriteCSV():
         writer = csv.writer(f)
         writer.writerow(['Name', 'Email', 'IP address (EC2)', 'SSH Info', 'Password', 'Browser Access', 'Splunk Observability URL'])
         for i in range(len(full_names)):
-            writer.writerow([full_names[i], emails[i], IPs[i], f"ssh ubuntu@{IPs[i]}", 'Observability2022!', f"http://{IPs[i]}:6501", f"http://app.us1.signalfx.com"])
+            writer.writerow([full_names[i], emails[i], IPs[i], f"ssh ubuntu@{IPs[i]}", 'Observability2022!', f"http://{IPs[i]}:6501", f"http://app.{sfx_realm}.signalfx.com"])
 
 
 if __name__ == '__main__':
