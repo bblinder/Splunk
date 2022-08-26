@@ -5,7 +5,7 @@ import csv
 import argparse
 
 argparser = argparse.ArgumentParser()
-argparser.add_argument('-m', '--members', help="Text file (ex: 'members.txt') containing email addresses, one per line")
+argparser.add_argument('-m', '--members', help="Text file containing email addresses, one per line. Default: 'members.txt'", default='members.txt')
 argparser.add_argument('-ip', '--ips', help='Text file containing EC2 IP addresses, one per line')
 argparser.add_argument('-r', '--realm', help='Splunk/SignalFX realm. Default: us1', required=False, default='us1')
 args = argparser.parse_args()
@@ -29,22 +29,24 @@ def sort_emails(email_list):
     
 def ExtractNames():
 # extract names from emails and put into a list
-    names = []
+    users = []
     for email in emails:
-        names.append(email.split('@')[0])
+        users.append(email.split('@')[0])
+    return users
+
 
     # Separate first and last names and capitalize
-    first_names = []
-    last_names = []
-    for name in names:
-        first_names.append(name.split('.')[0].capitalize())
-        last_names.append(name.split('.')[1].capitalize())
+    # first_names = []
+    # last_names = []
+    # for name in names:
+    #     first_names.append(name.split('.')[0].capitalize())
+    #     last_names.append(name.split('.')[1].capitalize())
 
-    # full names
-    full_names = []
-    for i in range(len(first_names)):
-        full_names.append(first_names[i] + ' ' + last_names[i])
-    return full_names
+    # # full names
+    # full_names = []
+    # for i in range(len(first_names)):
+    #     full_names.append(first_names[i] + ' ' + last_names[i])
+    # return full_names
 
 
 def IPaddresses():
@@ -64,9 +66,9 @@ def IPaddresses():
 def WriteCSV():
     with open('Attendees_List.csv', 'w') as f:
         writer = csv.writer(f)
-        writer.writerow(['Name', 'Email', 'IP address (EC2)', 'SSH Info', 'Password', 'Browser Access', 'Splunk Observability URL'])
-        for i in range(len(full_names)):
-            writer.writerow([full_names[i], emails[i], IPs[i], f"ssh ubuntu@{IPs[i]}", 'Observability2022!', f"http://{IPs[i]}:6501", f"http://app.{sfx_realm}.signalfx.com"])
+        writer.writerow(['User', 'Email', 'IP address (EC2)', 'SSH Info', 'Password', 'Browser Access', 'Splunk Observability URL'])
+        for i in range(len(users)):
+            writer.writerow([users[i], emails[i], IPs[i], f"ssh ubuntu@{IPs[i]}", 'Observability2022!', f"http://{IPs[i]}:6501", f"http://app.{sfx_realm}.signalfx.com"])
 
         
         # Accounting for the remaining IPs
@@ -79,12 +81,12 @@ def WriteCSV():
 
 
 if __name__ == '__main__':
-    if not args.members or not args.ips:
+    if not args.ips:
         argparser.print_help()
         sys.exit(1)
     else:
         emails = sort_emails(email_list)
         IPs = IPaddresses()
-        full_names = ExtractNames()
+        users = ExtractNames()
         WriteCSV()
     
