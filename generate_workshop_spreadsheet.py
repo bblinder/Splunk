@@ -5,12 +5,12 @@ import csv
 import argparse
 
 argparser = argparse.ArgumentParser()
-argparser.add_argument('-e', '--emails', help='Text file containing email addresses, one per line')
+argparser.add_argument('-m', '--members', help="Text file (ex: 'members.txt') containing email addresses, one per line")
 argparser.add_argument('-ip', '--ips', help='Text file containing EC2 IP addresses, one per line')
 argparser.add_argument('-r', '--realm', help='Splunk/SignalFX realm. Default: us1', required=False, default='us1')
 args = argparser.parse_args()
 
-email_list = args.emails
+email_list = args.members
 ec2_ips = args.ips
 sfx_realm = args.realm
 
@@ -79,7 +79,7 @@ def WriteCSV():
 
 
 if __name__ == '__main__':
-    if not args.emails or not args.ips:
+    if not args.members or not args.ips:
         argparser.print_help()
         sys.exit(1)
     else:
