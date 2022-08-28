@@ -1,13 +1,20 @@
 #!/usr/bin/env python3
 
+# Author: Brandon Blinderman
+# Email: bblinderman@splunk.com
+# Date: 2022-08-20
+
 import sys
 import csv
 import argparse
+import json
+from time import sleep
 
 argparser = argparse.ArgumentParser()
 argparser.add_argument('-m', '--members', help="Text file containing email addresses, one per line. Default: 'members.txt'", default='members.txt')
 argparser.add_argument('-ip', '--ips', help='Text file containing EC2 IP addresses, one per line')
 argparser.add_argument('-r', '--realm', help='Splunk/SignalFX realm. Default: us1', required=False, default='us1')
+argparser.description = "Generate a CSV file of attendees for the Splunk Observability Workshop"
 args = argparser.parse_args()
 
 email_list = args.members
@@ -16,7 +23,7 @@ sfx_realm = args.realm
 
 
 def sort_emails(email_list):
-    # import text file and put into a list and sort alphabetically
+    # import 'members.txt', put into a list, and sort alphabetically
     with open(email_list) as f:
         emails = f.read().splitlines()
         emails.sort()
@@ -28,7 +35,7 @@ def sort_emails(email_list):
 
     
 def ExtractNames():
-# extract names from emails and put into a list
+    # extract names from emails
     users = []
     for email in emails:
         users.append(email.split('@')[0])
@@ -51,20 +58,15 @@ def ExtractNames():
 
 def IPaddresses():
     IPs = []
+    # import json file containing EC2 IPs
     with open(ec2_ips) as f:
-        # remove empty lines and commas and quotes and trailing spaces
-        IPs = f.read().splitlines()
-        IPs = [IP for IP in IPs if IP]
-        IPs = [IP.replace(',', '') for IP in IPs]
-        IPs = [IP.replace('"', '') for IP in IPs]
-        IPs = [IP.strip() for IP in IPs]
-    # sort IPs
-    IPs.sort()
+        IPs = json.load(f)
+        IPs.sort()
     return IPs
 
 
 def WriteCSV():
-    with open('Attendees_List.csv', 'w') as f:
+    with open('Workshop_Attendees.csv', 'w') as f:
         writer = csv.writer(f)
         writer.writerow(['User', 'Email', 'IP address (EC2)', 'SSH Info', 'Password', 'Browser Access', 'Splunk Observability URL'])
         for i in range(len(users)):
@@ -88,5 +90,10 @@ if __name__ == '__main__':
         emails = sort_emails(email_list)
         IPs = IPaddresses()
         users = ExtractNames()
+
+        print(f"Generating CSV file for {len(emails)} attendees...")
+        sleep(1)
         WriteCSV()
+        # print location of CSV file
+        print(f"CSV file saved to: {sys.path[0]}/Workshop_Attendees.csv")
     
