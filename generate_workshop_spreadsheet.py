@@ -1,14 +1,23 @@
 #!/usr/bin/env python3
 
-# Author: Brandon Blinderman
-# Email: bblinderman@splunk.com
-# Date: 2023-02-16
+"""
+Author: Brandon Blinderman
+Email: bblinderman@splunk.com
+Date: 2023-03-20
+
+This script generates a CSV file of attendees for the Splunk Observability Workshop.
+
+Usage:
+./generate_workshop_spreadsheet.py -m <path/to/members.txt> -ip <path/to/ec2_ips.json> -r <realm> -p <ec2_password>
+"""
 
 import argparse
 import csv
 import json
+import os
 import sys
 from time import sleep
+from typing import List
 
 argparser = argparse.ArgumentParser()
 argparser.add_argument(
@@ -44,53 +53,49 @@ email_list = args.members
 ec2_ips = args.ips
 sfx_realm = args.realm
 ec2_password = args.password
+OUTPUT_FILENAME = "Workshop_Attendees.csv"
 
 
-def sort_emails(email_list):
-    """import 'members.txt', put into a list, and sort alphabetically"""
+def sort_emails(email_list: str) -> List[str]:
+    """
+    import 'members.txt', put into a list, and sort alphabetically.
+    Remove empty lines and commas and trailing spaces.
+    """
     with open(email_list, encoding="utf-8") as f:
         emails = f.read().splitlines()
+        emails = [email.replace(",", "").strip() for email in emails if email]
         emails.sort()
-        # remove empty lines and commas and trailing spaces
-        emails = [email for email in emails if email]
-        emails = [email.replace(",", "") for email in emails]
-        emails = [email.strip() for email in emails]
     return emails
 
 
-def ExtractNames():
+def extract_names(emails: List[str]) -> List[str]:
     """extract names/usernames from emails"""
-    users = []
-    for email in emails:
-        users.append(email.split("@")[0])
-    return users
-
-    # Separate first and last names and capitalize
-    # first_names = []
-    # last_names = []
-    # for name in names:
-    #     first_names.append(name.split('.')[0].capitalize())
-    #     last_names.append(name.split('.')[1].capitalize())
-
-    # # full names
-    # full_names = []
-    # for i in range(len(first_names)):
-    #     full_names.append(first_names[i] + ' ' + last_names[i])
-    # return full_names
+    return [email.split("@")[0] for email in emails]
 
 
-def IPaddresses():
+def load_ips(ec2_ips: str) -> List[str]:
     """import json file containing EC2 IPs"""
-    IPs = []
+    ips = []
     with open(ec2_ips, encoding="utf-8") as f:
-        IPs = json.load(f)
-        IPs.sort()
-    return IPs
+        ips = json.load(f)
+        ips.sort()
+    return ips
 
 
-def WriteCSV():
+def write_csv(
+    users: List[str],
+    emails: List[str],
+    ips: List[str],
+    sfx_realm: str,
+    ec2_password: str,
+) -> None:
     """writes CSV file using 'members.txt' and 'ec2_ips.json'"""
-    with open("Workshop_Attendees.csv", "w", encoding="utf-8") as f:
+    with open(
+        os.path.join(os.getcwd(), OUTPUT_FILENAME),
+        "w",
+        encoding="utf-8",
+        newline="",
+    ) as f:
         writer = csv.writer(f)
         writer.writerow(
             [
@@ -103,54 +108,27 @@ def WriteCSV():
                 "Splunk Observability URL",
             ]
         )
-        try:
-            for i in enumerate(users):
-                writer.writerow(
-                    [
-                        users[i[0]],
-                        emails[i[0]],
-                        IPs[i[0]],
-                        "ssh ubuntu@" + IPs[i[0]],
-                        ec2_password,
-                        "http://" + IPs[i[0]] + ":6501",
-                        f"https://app.{sfx_realm}.signalfx.com",
-                    ]
-                )
-        except IndexError:
-            extra_users = len(users) - len(IPs)
-            if extra_users > 0:
-                for i in range(extra_users):
-                    writer.writerow(
-                        [
-                            users[-1],
-                            emails[-1],
-                            "",
-                            "",
-                            "",
-                            "",
-                            "",
-                        ]
-                    )
-                    users.pop()
-                    emails.pop()
-
-        # Accounting for the remaining IPs
-        extra_IPs = len(IPs) - len(emails)
-        if extra_IPs > 0:
-            # add extra IPs to the end of the list
-            for i in range(extra_IPs):
-                writer.writerow(
-                    [
-                        "",
-                        "",
-                        IPs[-1],
-                        f"ssh ubuntu@{IPs[-1]}",
-                        ec2_password,
-                        f"http://{IPs[-1]}:6501",
-                        f"https://app.{sfx_realm}.signalfx.com",
-                    ]
-                )
-                IPs.pop()
+        num_users = len(users)
+        num_ips = len(ips)
+        for i in range(max(num_users, num_ips)):
+            user = users[i] if i < num_users else ""
+            email = emails[i] if i < num_users else ""
+            ip = ips[i] if i < num_ips else ""
+            ssh_info = f"ssh ubuntu@{ip}" if ip else ""
+            ec2_password = ec2_password if ip else ""
+            browser_access = f"http://{ip}:6501" if ip else ""
+            sfx_url = f"https://app.{sfx_realm}.signalfx.com" if ip else ""
+            writer.writerow(
+                [
+                    user,
+                    email,
+                    ip,
+                    ssh_info,
+                    ec2_password,
+                    browser_access,
+                    sfx_url,
+                ]
+            )
 
 
 if __name__ == "__main__":
@@ -159,10 +137,10 @@ if __name__ == "__main__":
         sys.exit(1)
     else:
         emails = sort_emails(email_list)
-        IPs = IPaddresses()
-        users = ExtractNames()
+        users = extract_names(emails)
+        ips = load_ips(ec2_ips)
 
         print(f"Generating CSV file for {len(emails)} attendees...")
         sleep(1)
-        WriteCSV()
-        print(f"CSV file saved to: {sys.path[0]}/Workshop_Attendees.csv")
+        write_csv(users, emails, ips, sfx_realm, ec2_password)
+        print(f"CSV file saved to: {sys.path[0]}/{OUTPUT_FILENAME}")
