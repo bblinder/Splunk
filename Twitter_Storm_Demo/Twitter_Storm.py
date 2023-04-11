@@ -68,11 +68,11 @@ def send_tweet(realm, org_access_token):
 
     """
     tweets = read_tweets()
-    username = generate_username()
     endpoint = f"https://ingest.{realm}.signalfx.com/v2/event"
     headers = {"Content-Type": "application/json", "X-SF-TOKEN": org_access_token}
 
     for tweet_text in tweets:
+        username = generate_username()
         tweet = f"twitter: {tweet_text} - @{username}"
         data = [
             {
