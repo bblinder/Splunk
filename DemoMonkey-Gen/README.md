@@ -64,25 +64,25 @@ python3 generate_demomonkey.py --realm us0 --environment bblinderman --token xxx
 You should see an output like this:
 
 ```bash
-2023-04-26 11:23:21,695 Retrieved 16 nodes from O11y API.
-2023-04-26 11:23:21,801 Generated 12 fake microservices.
-2023-04-26 11:23:21,802 Mapped 12 domains to services.
-2023-04-26 11:23:21,803 DemoMonkey config written to demomonkey_config.mnky
+2023-04-26 12:21:11,158 Retrieved 16 nodes from O11y API.
+2023-04-26 12:21:11,263 Generated 12 fake microservices.
+2023-04-26 12:21:11,263 Mapped 12 domains to services.
+2023-04-26 12:21:11,264 DemoMonkey config written to /Users/bblinderman/Github/Splunk/DemoMonkey-Gen/demomonkey_config.mnky
 ```
 
-Look for a configuration filed called `demomonkey_config.mnky` in the same directory the script was run from.
+Look for a configuration file called `demomonkey_config.mnky`. The script should output the full path to the config file.
 
-You can upload it directly to DemoMonkey from there, or copy/paste its contents instead. A quick way to do this on MacOS is by using `pbcopy`:
+You can upload it directly to DemoMonkey, or copy/paste its contents. A quick way to do this is via `pbcopy` on MacOS:
 
 ```bash
 cat demomonkey_config.mnky | pbcopy
 ```
 
-From there, you can paste the config directly into DemoMonkey:
+You can then paste the contents directly into DemoMonkey:
 
 ![](images/2023-04-26%20at%2011.43.21.png)
 
-Activate your DemoMonkey config.
+Next, activate your DemoMonkey config for the changes to take effect.
 
 ## Result
 
