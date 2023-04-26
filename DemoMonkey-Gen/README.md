@@ -88,8 +88,8 @@ Activate your DemoMonkey config.
 
 Your demo should go from looking like this:
 
-![](/images/2023-04-26%20at%2011.40.58.png)
+![](images/2023-04-26%20at%2011.40.58.png)
 
 To this:
 
-![](/images/2023-04-26%20at%2011.41.39.png)
+![](images/2023-04-26%20at%2011.41.39.png)
