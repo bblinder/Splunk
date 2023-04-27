@@ -5,14 +5,16 @@ import json
 import logging
 import os
 import pickle
-import random
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
+from time import sleep
 
 import faker_microservice
 import requests
 from faker import Faker
+from rich.console import Console
+from rich.syntax import Syntax
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 
@@ -96,7 +98,7 @@ def generate_fake_microservices(service_names, base_domain=None):
         # microservice_domain = f"{microservice}.{base_domain}"
         microservice_domain = f"{microservice}"
         microservices.append(microservice_domain)
-
+    sleep(0.4)
     logging.info(f"Generated {len(microservices)} fake microservices.")
     return microservices
 
@@ -106,6 +108,7 @@ def map_domains_to_services(service_names, microservices):
     Map domain names to service names.
     """
     service_microservice_map = dict(zip(service_names, microservices))
+    sleep(0.4)
     logging.info(f"Mapped {len(service_microservice_map)} domains to services.")
     return service_microservice_map
 
@@ -164,7 +167,22 @@ def main(realm, token, environment, base_domain=None):
         logging.error("No service names retrieved.")
         return
 
-    write_demomonkey_config(service_names, base_domain)
+    demomonkey_config_file = write_demomonkey_config(service_names, base_domain)
+
+    # write_demomonkey_config(service_names, base_domain)
+
+    with open(demomonkey_config_file, "r") as file:
+        demomonkey_config = file.read()
+
+    console = Console()
+    console.print("\n[bold]DemoMonkey config:[/bold]")
+    console.print("--------------")
+    syntax = Syntax(demomonkey_config, "ini", theme="ansi_dark", line_numbers=False)
+    console.print(syntax)
+    console.print("--------------\n")
+    console.print(
+        f"DemoMonkey config written to [bold]{Path.cwd() / demomonkey_config_file}[/bold]\n"
+    )
 
 
 if __name__ == "__main__":
