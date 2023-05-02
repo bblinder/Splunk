@@ -98,7 +98,7 @@ def generate_fake_microservices(service_names, base_domain=None):
         # microservice_domain = f"{microservice}.{base_domain}"
         microservice_domain = f"{microservice}"
         microservices.append(microservice_domain)
-    sleep(0.4)
+    sleep(0.2)
     logging.info(f"Generated {len(microservices)} fake microservices.")
     return microservices
 
@@ -108,7 +108,7 @@ def map_domains_to_services(service_names, microservices):
     Map domain names to service names.
     """
     service_microservice_map = dict(zip(service_names, microservices))
-    sleep(0.4)
+    sleep(0.2)
     logging.info(f"Mapped {len(service_microservice_map)} domains to services.")
     return service_microservice_map
 
