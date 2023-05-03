@@ -26,13 +26,14 @@ SIGNALFLOW_CACHE_FILE = "signalflow_cache.pickle"
 SIGNALFLOW_CACHE_TIMEOUT = timedelta(minutes=10)
 
 PROGRAM = (
-        "E = (C).publish(label='E', enable=False)\n"
-        "A = data('rum.workflow.count', filter=filter('workflow.name', '*')).sum(by=['workflow.name']).publish(label='A', enable=False)\n"
-        "B = data('rum.workflow.time.ns.p75', filter=filter('workflow.name', '*'), rollup='average').mean(by=['sf_operation']).top(count=10).publish(label='B')\n"
-        "C = (B/1000000000).percentile(pct=75, by=['workflow.name']).publish(label='C', enable=False)\n"
-        "D = (A*C).publish(label='D', enable=False)\n"
-        "F = alerts(detector_id='FYKubjFAgAA').publish(label='F')"
+    "E = (C).publish(label='E', enable=False)\n"
+    "A = data('rum.workflow.count', filter=filter('workflow.name', '*')).sum(by=['workflow.name']).publish(label='A', enable=False)\n"
+    "B = data('rum.workflow.time.ns.p75', filter=filter('workflow.name', '*'), rollup='average').mean(by=['sf_operation']).top(count=10).publish(label='B')\n"
+    "C = (B/1000000000).percentile(pct=75, by=['workflow.name']).publish(label='C', enable=False)\n"
+    "D = (A*C).publish(label='D', enable=False)\n"
+    "F = alerts(detector_id='FYKubjFAgAA').publish(label='F')"
 )
+
 
 def run_signalflow_program(sfx_token, program):
     command = f"signalflow --token {sfx_token} --start=-5m --stop=-1m"
@@ -68,7 +69,8 @@ def cache_signalflow_output(extracted_values):
     """Cache extracted values from SignalFlow output."""
     with open(SIGNALFLOW_CACHE_FILE, "wb") as cache_file:
         pickle.dump(
-            {"timestamp": datetime.utcnow(), "extracted_values": extracted_values}, cache_file
+            {"timestamp": datetime.utcnow(), "extracted_values": extracted_values},
+            cache_file,
         )
 
 
@@ -245,7 +247,9 @@ def main(realm, token, environment, base_domain=None):
         extracted_values = run_signalflow_program(token, program)
         cache_signalflow_output(extracted_values)
 
-    demomonkey_config_file = write_demomonkey_config(service_names, base_domain, extracted_values)
+    demomonkey_config_file = write_demomonkey_config(
+        service_names, base_domain, extracted_values
+    )
 
     with open(demomonkey_config_file, "r") as file:
         demomonkey_config = file.read()
