@@ -38,8 +38,10 @@ By default, the service names retrieved via API are cached for 10 minutes.
 ## Usage
 
 ### Setting up our environment
-1. Run `python3 -m venv venv`
-2. Run `source venv/bin/activate`
+1. Clone this repo: `git clone https://github.com/bblinder/Splunk.git`
+2. `cd Splunk/DemoMonkey-Gen`
+3. Run `python3 -m venv venv`
+4. Run `source venv/bin/activate`
 
 ### Installing dependencies
 
