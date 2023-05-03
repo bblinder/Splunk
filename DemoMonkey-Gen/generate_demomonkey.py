@@ -6,6 +6,9 @@ import logging
 import os
 import pickle
 import sys
+import re
+import subprocess
+import pandas as pd
 from datetime import datetime, timedelta
 from pathlib import Path
 from time import sleep
@@ -20,6 +23,35 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 
 CACHE_FILE = "service_names_cache.pickle"
 CACHE_TIMEOUT = timedelta(minutes=10)
+
+
+def run_signalflow_program(sfx_token, program):
+    command = f"signalflow --token {sfx_token} --start=-5m --stop=-1m"
+    process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, shell=True)
+    stdout, stderr = process.communicate(input=program)
+
+    if process.returncode != 0:
+        logging.error(f"Error running SignalFlow program: {stderr}")
+        return
+
+    extracted_values = []
+    for line in stdout.splitlines():
+        match = re.search(r"([A-Za-z0-9_\s]+):\s+\[", line)
+        if match:
+            extracted_values.append(match.group(1).strip())
+
+    # Create a pandas DataFrame from the extracted values
+    df = pd.DataFrame(extracted_values, columns=["workflow"])
+
+    # Sort the DataFrame by workflow name and select the top 50 results
+    top_workflows = df.workflow.value_counts().nlargest(50)
+
+    # Convert the top 20 workflow names to a list
+    top_workflow_names = top_workflows.index.tolist()
+
+    print(top_workflow_names)
+    return top_workflow_names
+
 
 
 def get_service_names(sfx_token, sfx_realm, o11y_environment):
@@ -113,7 +145,7 @@ def map_domains_to_services(service_names, microservices):
     return service_microservice_map
 
 
-def write_demomonkey_config(service_names, base_domain=None):
+def write_demomonkey_config(service_names, base_domain=None, extracted_values=None):
     microservices = generate_fake_microservices(service_names, base_domain)
     service_microservice_map = map_domains_to_services(service_names, microservices)
 
@@ -130,6 +162,11 @@ def write_demomonkey_config(service_names, base_domain=None):
         )
         domain_line = f"; $domain=//Set the main domain of your prospect. This will be used in the User Experience Section"
 
+    if extracted_values:
+        extracted_values_line = "\n".join(f"; {value}" for value in extracted_values)
+    else:
+        extracted_values_line = ""
+
     demomonkey_config = f"""; [Options]
 ; ; This configuration is set to run on all websites with a wildcard pattern
 ; @include[] = /^https?.*$/
@@ -145,6 +182,9 @@ def write_demomonkey_config(service_names, base_domain=None):
 {domain_line}
 
 {replacements}
+
+; Extracted workflow from SignalFlow
+{extracted_values_line}
 """
     with open("demomonkey_config.mnky", "w") as file:
         file.write(demomonkey_config)
@@ -174,15 +214,17 @@ def main(realm, token, environment, base_domain=None):
     with open(demomonkey_config_file, "r") as file:
         demomonkey_config = file.read()
 
-    console = Console()
-    console.print("\n[bold]DemoMonkey config:[/bold]")
-    console.print("--------------")
-    syntax = Syntax(demomonkey_config, "ini", theme="ansi_dark", line_numbers=False)
-    console.print(syntax)
-    console.print("--------------\n")
-    console.print(
-        f"DemoMonkey config written to [bold]{Path.cwd() / demomonkey_config_file}[/bold]\n"
-    )
+    # console = Console()
+    # console.print("\n[bold]DemoMonkey config:[/bold]")
+    # console.print("--------------")
+    # syntax = Syntax(demomonkey_config, "ini", theme="ansi_dark", line_numbers=False)
+    # console.print(syntax)
+    # console.print("--------------\n")
+    # console.print(
+    #     f"DemoMonkey config written to [bold]{Path.cwd() / demomonkey_config_file}[/bold]\n"
+    # )
+
+    return service_names
 
 
 if __name__ == "__main__":
@@ -218,4 +260,19 @@ if __name__ == "__main__":
         )
         sys.exit(1)
 
-    main(args.realm, args.token, args.environment, args.base_domain)
+    service_names = main(args.realm, args.token, args.environment, args.base_domain)
+
+    program = (
+        "E = (C).publish(label='E', enable=False)\n"
+        "A = data('rum.workflow.count', filter=filter('workflow.name', '*')).sum(by=['workflow.name']).publish(label='A', enable=False)\n"
+        "B = data('rum.workflow.time.ns.p75', filter=filter('workflow.name', '*'), rollup='average').mean(by=['sf_operation']).top(count=10).publish(label='B')\n"
+        "C = (B/1000000000).percentile(pct=75, by=['workflow.name']).publish(label='C', enable=False)\n"
+        "D = (A*C).publish(label='D', enable=False)\n"
+        "F = alerts(detector_id='FYKubjFAgAA').publish(label='F')"
+    )
+
+    extracted_values = run_signalflow_program(args.token, program)
+
+    if extracted_values:
+        demomonkey_config_file = write_demomonkey_config(service_names, args.base_domain, extracted_values)
+

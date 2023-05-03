@@ -42,9 +42,13 @@ By default, the service names retrieved via API are cached for 10 minutes.
 
 ### Installing dependencies
 
-Install dependencies in the `requirements.txt` file:
+1. Install dependencies in the `requirements.txt` file:
 
 `pip3 install -r requirements.txt --upgrade`
+
+2. Install the latest version of the SignalFlow CLI:
+
+`pip3 install git+https://github.com/signalfx/signalflow-cli`
 
 ### Running the script
 
