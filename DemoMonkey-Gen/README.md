@@ -9,6 +9,7 @@ The Python script generates a DemoMonkey configuration file, using existing APM 
 - Python 3.6 or higher
 - [DemoMonkey](https://chrome.google.com/webstore/detail/demomonkey/jgbhioialphpgjgofopnplfibkeehgjd) (Chrome extension)
 - [Splunk Observability Cloud token](https://docs.splunk.com/Observability/admin/authentication-tokens/tokens.html#nav-Create-and-manage-authentication-tokens), with **API permissions enabled**
+- [The SignalFlow CLI](https://github.com/signalfx/signalflow-cli)
 
 ## Overview
 
@@ -42,13 +43,9 @@ By default, the service names retrieved via API are cached for 10 minutes.
 
 ### Installing dependencies
 
-1. Install dependencies in the `requirements.txt` file:
+1. Install dependencies in the `requirements.txt` file: `pip3 install -r requirements.txt --upgrade`
 
-`pip3 install -r requirements.txt --upgrade`
-
-2. Install the latest version of the SignalFlow CLI:
-
-`pip3 install git+https://github.com/signalfx/signalflow-cli`
+2. Install the latest version of the SignalFlow CLI: `pip3 install git+https://github.com/signalfx/signalflow-cli`
 
 ### Running the script
 
