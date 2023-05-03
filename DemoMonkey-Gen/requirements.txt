@@ -1,5 +1,3 @@
 Faker
 faker-microservice
 requests
-rich
-pandas

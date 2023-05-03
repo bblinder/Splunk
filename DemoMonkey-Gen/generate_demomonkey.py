@@ -5,10 +5,10 @@ import json
 import logging
 import os
 import pickle
-import sys
 import re
 import subprocess
-import pandas as pd
+import sys
+from collections import Counter
 from datetime import datetime, timedelta
 from pathlib import Path
 from time import sleep
@@ -16,18 +16,29 @@ from time import sleep
 import faker_microservice
 import requests
 from faker import Faker
-from rich.console import Console
-from rich.syntax import Syntax
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 
 CACHE_FILE = "service_names_cache.pickle"
 CACHE_TIMEOUT = timedelta(minutes=10)
 
+SIGNALFLOW_CACHE_FILE = "signalflow_cache.pickle"
+SIGNALFLOW_CACHE_TIMEOUT = timedelta(minutes=10)
+
+PROGRAM = (
+        "E = (C).publish(label='E', enable=False)\n"
+        "A = data('rum.workflow.count', filter=filter('workflow.name', '*')).sum(by=['workflow.name']).publish(label='A', enable=False)\n"
+        "B = data('rum.workflow.time.ns.p75', filter=filter('workflow.name', '*'), rollup='average').mean(by=['sf_operation']).top(count=10).publish(label='B')\n"
+        "C = (B/1000000000).percentile(pct=75, by=['workflow.name']).publish(label='C', enable=False)\n"
+        "D = (A*C).publish(label='D', enable=False)\n"
+        "F = alerts(detector_id='FYKubjFAgAA').publish(label='F')"
+)
 
 def run_signalflow_program(sfx_token, program):
     command = f"signalflow --token {sfx_token} --start=-5m --stop=-1m"
-    process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, shell=True)
+    process = subprocess.Popen(
+        command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, shell=True
+    )
     stdout, stderr = process.communicate(input=program)
 
     if process.returncode != 0:
@@ -40,18 +51,36 @@ def run_signalflow_program(sfx_token, program):
         if match:
             extracted_values.append(match.group(1).strip())
 
-    # Create a pandas DataFrame from the extracted values
-    df = pd.DataFrame(extracted_values, columns=["workflow"])
+    # Create a Counter object from the extracted values
+    value_counts = Counter(extracted_values)
 
-    # Sort the DataFrame by workflow name and select the top 50 results
-    top_workflows = df.workflow.value_counts().nlargest(50)
+    # Get the top 50 most common workflow names
+    top_workflows = value_counts.most_common(50)
 
-    # Convert the top 20 workflow names to a list
-    top_workflow_names = top_workflows.index.tolist()
+    # Extract the top 20 workflow names to a list
+    top_workflow_names = [workflow[0] for workflow in top_workflows]
 
-    print(top_workflow_names)
+    logging.info(f"Extracted {len(top_workflow_names)} workflow names from SignalFlow.")
     return top_workflow_names
 
+
+def cache_signalflow_output(extracted_values):
+    """Cache extracted values from SignalFlow output."""
+    with open(SIGNALFLOW_CACHE_FILE, "wb") as cache_file:
+        pickle.dump(
+            {"timestamp": datetime.utcnow(), "extracted_values": extracted_values}, cache_file
+        )
+
+
+def load_signalflow_output_from_cache():
+    """Load extracted values from SignalFlow output cache."""
+    if not Path(SIGNALFLOW_CACHE_FILE).is_file():
+        return None
+    with open(SIGNALFLOW_CACHE_FILE, "rb") as cache_file:
+        cached_data = pickle.load(cache_file)
+    if datetime.utcnow() - cached_data["timestamp"] > SIGNALFLOW_CACHE_TIMEOUT:
+        return None
+    return cached_data["extracted_values"]
 
 
 def get_service_names(sfx_token, sfx_realm, o11y_environment):
@@ -183,7 +212,7 @@ def write_demomonkey_config(service_names, base_domain=None, extracted_values=No
 
 {replacements}
 
-; Extracted workflow from SignalFlow
+; Extracted workflow names from SignalFlow
 {extracted_values_line}
 """
     with open("demomonkey_config.mnky", "w") as file:
@@ -207,22 +236,19 @@ def main(realm, token, environment, base_domain=None):
         logging.error("No service names retrieved.")
         return
 
-    demomonkey_config_file = write_demomonkey_config(service_names, base_domain)
+    extracted_values = load_signalflow_output_from_cache()
 
-    # write_demomonkey_config(service_names, base_domain)
+    if extracted_values:
+        logging.info("Using cached SignalFlow output.")
+    else:
+        program = PROGRAM
+        extracted_values = run_signalflow_program(token, program)
+        cache_signalflow_output(extracted_values)
+
+    demomonkey_config_file = write_demomonkey_config(service_names, base_domain, extracted_values)
 
     with open(demomonkey_config_file, "r") as file:
         demomonkey_config = file.read()
-
-    # console = Console()
-    # console.print("\n[bold]DemoMonkey config:[/bold]")
-    # console.print("--------------")
-    # syntax = Syntax(demomonkey_config, "ini", theme="ansi_dark", line_numbers=False)
-    # console.print(syntax)
-    # console.print("--------------\n")
-    # console.print(
-    #     f"DemoMonkey config written to [bold]{Path.cwd() / demomonkey_config_file}[/bold]\n"
-    # )
 
     return service_names
 
@@ -260,19 +286,4 @@ if __name__ == "__main__":
         )
         sys.exit(1)
 
-    service_names = main(args.realm, args.token, args.environment, args.base_domain)
-
-    program = (
-        "E = (C).publish(label='E', enable=False)\n"
-        "A = data('rum.workflow.count', filter=filter('workflow.name', '*')).sum(by=['workflow.name']).publish(label='A', enable=False)\n"
-        "B = data('rum.workflow.time.ns.p75', filter=filter('workflow.name', '*'), rollup='average').mean(by=['sf_operation']).top(count=10).publish(label='B')\n"
-        "C = (B/1000000000).percentile(pct=75, by=['workflow.name']).publish(label='C', enable=False)\n"
-        "D = (A*C).publish(label='D', enable=False)\n"
-        "F = alerts(detector_id='FYKubjFAgAA').publish(label='F')"
-    )
-
-    extracted_values = run_signalflow_program(args.token, program)
-
-    if extracted_values:
-        demomonkey_config_file = write_demomonkey_config(service_names, args.base_domain, extracted_values)
-
+    main(args.realm, args.token, args.environment, args.base_domain)
