@@ -36,19 +36,12 @@ PROGRAM = (
 def run_signalflow_program(sfx_token, program):
     """
     Runs the Signalflow CLI to extract RUM workflow names.
-    Args:
-        sfx_token (str): SignalFx access token.
-        program (str): SignalFlow program to execute.
-    Returns:
-        list: A list of the top 20 workflow names extracted from the output
-        of the SignalFlow program.
     """
-    command = f"signalflow --token {sfx_token} --start=-5m --stop=-1m"
+    command = ["signalflow", "--token", sfx_token, "--start=-5m", "--stop=-1m"]
     process = subprocess.Popen(command,
                                stdin=subprocess.PIPE,
                                stdout=subprocess.PIPE,
-                               text=True,
-                               shell=True)
+                               text=True)
     stdout, stderr = process.communicate(input=program)
 
     if process.returncode != 0:
@@ -172,7 +165,6 @@ def generate_fake_microservices(service_names, base_domain=None):
         # microservice_domain = f"{microservice}.{base_domain}"
         microservice_domain = f"{microservice}"
         microservices.append(microservice_domain)
-    sleep(0.2)
     logging.info(f"Generated {len(microservices)} fake microservices.")
     return microservices
 
@@ -182,7 +174,6 @@ def map_domains_to_services(service_names, microservices):
     Map domain names to service names.
     """
     service_microservice_map = dict(zip(service_names, microservices))
-    sleep(0.2)
     logging.info(
         f"Mapped {len(service_microservice_map)} domains to services.")
     return service_microservice_map
