@@ -30,16 +30,16 @@ PROGRAM = (
     "A = data('rum.workflow.count', filter=filter('workflow.name', '*')).sum(by=['workflow.name']).publish(label='A', enable=False)\n"
     "B = data('rum.workflow.time.ns.p75', filter=filter('workflow.name', '*'), rollup='average').mean(by=['sf_operation']).top(count=10).publish(label='B')\n"
     "C = (B/1000000000).percentile(pct=75, by=['workflow.name']).publish(label='C', enable=False)\n"
-    "D = (A*C).publish(label='D', enable=False)\n"
-    "F = alerts(detector_id='FYKubjFAgAA').publish(label='F')"
-)
+    "D = (A*C).publish(label='D', enable=False)\n")
 
 
 def run_signalflow_program(sfx_token, program):
     command = f"signalflow --token {sfx_token} --start=-5m --stop=-1m"
-    process = subprocess.Popen(
-        command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, shell=True
-    )
+    process = subprocess.Popen(command,
+                               stdin=subprocess.PIPE,
+                               stdout=subprocess.PIPE,
+                               text=True,
+                               shell=True)
     stdout, stderr = process.communicate(input=program)
 
     if process.returncode != 0:
@@ -61,7 +61,8 @@ def run_signalflow_program(sfx_token, program):
     # Extract the top 20 workflow names to a list
     top_workflow_names = [workflow[0] for workflow in top_workflows]
 
-    logging.info(f"Extracted {len(top_workflow_names)} workflow names from SignalFlow.")
+    logging.info(
+        f"Extracted {len(top_workflow_names)} workflow names from SignalFlow.")
     return top_workflow_names
 
 
@@ -69,7 +70,10 @@ def cache_signalflow_output(extracted_values):
     """Cache extracted values from SignalFlow output."""
     with open(SIGNALFLOW_CACHE_FILE, "wb") as cache_file:
         pickle.dump(
-            {"timestamp": datetime.utcnow(), "extracted_values": extracted_values},
+            {
+                "timestamp": datetime.utcnow(),
+                "extracted_values": extracted_values
+            },
             cache_file,
         )
 
@@ -95,19 +99,16 @@ def get_service_names(sfx_token, sfx_realm, o11y_environment):
     one_hour_ago = now - timedelta(hours=1)
     time_range = f"{one_hour_ago.isoformat()}Z/{now.isoformat()}Z"
 
-    payload = json.dumps(
-        {
-            "timeRange": time_range,
-            "tagFilters": [
-                {
-                    "name": "sf_environment",
-                    "operator": "equals",
-                    "scope": "global",
-                    "value": o11y_environment,
-                }
-            ],
-        }
-    )
+    payload = json.dumps({
+        "timeRange":
+        time_range,
+        "tagFilters": [{
+            "name": "sf_environment",
+            "operator": "equals",
+            "scope": "global",
+            "value": o11y_environment,
+        }],
+    })
     headers = {"Content-Type": "application/json", "X-SF-Token": sfx_token}
 
     response = requests.post(url, headers=headers, data=payload, timeout=15)
@@ -122,8 +123,7 @@ def get_service_names(sfx_token, sfx_realm, o11y_environment):
     )
 
     service_names = [
-        node["serviceName"]
-        for node in response_data["data"]["nodes"]
+        node["serviceName"] for node in response_data["data"]["nodes"]
         if node["type"] == "service"
     ]
     return service_names
@@ -133,8 +133,10 @@ def cache_service_names(service_names):
     """Cache service names to a file."""
     with open(CACHE_FILE, "wb") as cache_file:
         pickle.dump(
-            {"timestamp": datetime.utcnow(), "service_names": service_names}, cache_file
-        )
+            {
+                "timestamp": datetime.utcnow(),
+                "service_names": service_names
+            }, cache_file)
 
 
 def load_service_names_from_cache():
@@ -172,29 +174,32 @@ def map_domains_to_services(service_names, microservices):
     """
     service_microservice_map = dict(zip(service_names, microservices))
     sleep(0.2)
-    logging.info(f"Mapped {len(service_microservice_map)} domains to services.")
+    logging.info(
+        f"Mapped {len(service_microservice_map)} domains to services.")
     return service_microservice_map
 
 
-def write_demomonkey_config(service_names, base_domain=None, extracted_values=None):
+def write_demomonkey_config(service_names,
+                            base_domain=None,
+                            extracted_values=None):
     microservices = generate_fake_microservices(service_names, base_domain)
-    service_microservice_map = map_domains_to_services(service_names, microservices)
+    service_microservice_map = map_domains_to_services(service_names,
+                                                       microservices)
 
     if base_domain:
         replacements = "\n".join(
             f"{service} = {microservice}.$domain"
-            for service, microservice in service_microservice_map.items()
-        )
+            for service, microservice in service_microservice_map.items())
         domain_line = f"$domain={base_domain}//Set the main domain of your prospect. This will be used in the User Experience Section"
     else:
         replacements = "\n".join(
             f"{service} = {microservice}"
-            for service, microservice in service_microservice_map.items()
-        )
+            for service, microservice in service_microservice_map.items())
         domain_line = f"; $domain=//Set the main domain of your prospect. This will be used in the User Experience Section"
 
     if extracted_values:
-        extracted_values_line = "\n".join(f"; {value}" for value in extracted_values)
+        extracted_values_line = "\n".join(f"; {value}"
+                                          for value in extracted_values)
     else:
         extracted_values_line = ""
 
@@ -214,7 +219,7 @@ def write_demomonkey_config(service_names, base_domain=None, extracted_values=No
 
 {replacements}
 
-; Extracted workflow names from SignalFlow
+; Top RUM workflow names from SignalFlow (use command/ctrl + "/" to bulk uncomment)
 {extracted_values_line}
 """
     with open("demomonkey_config.mnky", "w") as file:
@@ -247,9 +252,9 @@ def main(realm, token, environment, base_domain=None):
         extracted_values = run_signalflow_program(token, program)
         cache_signalflow_output(extracted_values)
 
-    demomonkey_config_file = write_demomonkey_config(
-        service_names, base_domain, extracted_values
-    )
+    demomonkey_config_file = write_demomonkey_config(service_names,
+                                                     base_domain,
+                                                     extracted_values)
 
     with open(demomonkey_config_file, "r") as file:
         demomonkey_config = file.read()
@@ -259,15 +264,17 @@ def main(realm, token, environment, base_domain=None):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Generate DemoMonkey config with SignalFx service names and custom domain names"
+        description=
+        "Generate DemoMonkey config with SignalFx service names and custom domain names"
     )
-    parser.add_argument(
-        "--realm", default="us0", help="SignalFx realm (e.g. us0, us1, etc.)"
-    )
+    parser.add_argument("--realm",
+                        default="us0",
+                        help="SignalFx realm (e.g. us0, us1, etc.)")
     parser.add_argument(
         "--token",
         required=False,
-        help="SignalFx API token (optional if using environment variable SFX_TOKEN)",
+        help=
+        "SignalFx API token (optional if using environment variable SFX_TOKEN)",
     )
     parser.add_argument(
         "--environment",
@@ -278,7 +285,8 @@ if __name__ == "__main__":
         "-d",
         "--base-domain",
         required=False,
-        help="Base domain for the fake microservices (e.g. splunk.com). Blank by default.",
+        help=
+        "Base domain for the fake microservices (e.g. splunk.com). Blank by default.",
     )
 
     args = parser.parse_args()
