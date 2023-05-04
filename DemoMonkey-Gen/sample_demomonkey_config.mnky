@@ -12,15 +12,28 @@
 [Variables]
 ; $domain=//Set the main domain of your prospect. This will be used in the User Experience Section
 
-Idp = payment-adaptor
-api = newcosmosservice
-authorization = authenticationadaptor
-catalog = legacyqueryfrontend
-checkout = old_smb_bridge
-shipping = sale-manager
-emailservice = blob-backend
-mySql = dynamodb-db
-ColtEmailService = orderplatform
-payment = newpromobackend
-PeachPay = new_print_backend
-PwnyPostalService = elasticservice
+productcatalogservice = conversionmanager
+frontend = conversion_manager
+currencyservice = legacy-monolith-adapter
+cartservice = new_oracle_db
+shippingservice = dynamodb_dashboard
+paymentservice = newpromodb
+checkoutservice = printprocessor
+recommendationservice = document-database
+ButtercupPayments = maria-database
+adservice = neworderplatform
+emailservice = promo-frontend
+
+; Top RUM workflow names from SignalFlow (use command/ctrl + "/" to bulk uncomment)
+; CartPageError
+; ProductDetails
+; PlaceOrder
+; AddToCart
+; ProductListLoaded
+; ProductDetails_Terrarium
+; Time_to_Ready
+; ProductDetails_Home Barista Kit
+; ProductDetails_Vintage Camera Lens
+; Checkout
+; ProductDetails_Vintage Typewriter
+; Payment_Success

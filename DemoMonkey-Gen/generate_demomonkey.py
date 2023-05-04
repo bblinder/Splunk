@@ -28,12 +28,21 @@ SIGNALFLOW_CACHE_TIMEOUT = timedelta(minutes=10)
 PROGRAM = (
     "E = (C).publish(label='E', enable=False)\n"
     "A = data('rum.workflow.count', filter=filter('workflow.name', '*')).sum(by=['workflow.name']).publish(label='A', enable=False)\n"
-    "B = data('rum.workflow.time.ns.p75', filter=filter('workflow.name', '*'), rollup='average').mean(by=['sf_operation']).top(count=10).publish(label='B')\n"
+    "B = data('rum.workflow.time.ns.p75', filter=filter('workflow.name', '*'), rollup='average').mean(by=['sf_operation']).top(count=30).publish(label='B')\n"
     "C = (B/1000000000).percentile(pct=75, by=['workflow.name']).publish(label='C', enable=False)\n"
     "D = (A*C).publish(label='D', enable=False)\n")
 
 
 def run_signalflow_program(sfx_token, program):
+    """
+    Runs the Signalflow CLI to extract RUM workflow names.
+    Args:
+        sfx_token (str): SignalFx access token.
+        program (str): SignalFlow program to execute.
+    Returns:
+        list: A list of the top 20 workflow names extracted from the output
+        of the SignalFlow program.
+    """
     command = f"signalflow --token {sfx_token} --start=-5m --stop=-1m"
     process = subprocess.Popen(command,
                                stdin=subprocess.PIPE,
@@ -58,7 +67,7 @@ def run_signalflow_program(sfx_token, program):
     # Get the top 50 most common workflow names
     top_workflows = value_counts.most_common(50)
 
-    # Extract the top 20 workflow names to a list
+    # Extract the workflow names to a list
     top_workflow_names = [workflow[0] for workflow in top_workflows]
 
     logging.info(
@@ -182,6 +191,15 @@ def map_domains_to_services(service_names, microservices):
 def write_demomonkey_config(service_names,
                             base_domain=None,
                             extracted_values=None):
+    """
+    Writes a DemoMonkey config file.
+    Args:
+        service_names (list): The list of service names to use in the config file.
+        base_domain (str, optional): The prospect's domain name to use for each microservice.
+        extracted_values (list, optional): The extracted values from a SignalFlow program's output.
+    Returns:
+        str: The contents of the DemoMonkey config file.
+    """
     microservices = generate_fake_microservices(service_names, base_domain)
     service_microservice_map = map_domains_to_services(service_names,
                                                        microservices)
@@ -219,7 +237,9 @@ def write_demomonkey_config(service_names,
 
 {replacements}
 
-; Top RUM workflow names from SignalFlow (use command/ctrl + "/" to bulk uncomment)
+; Top RUM workflow names from SignalFlow (use command/ctrl + "/" to bulk uncomment).
+; Can be matched with prospect domains/URL paths.
+
 {extracted_values_line}
 """
     with open("demomonkey_config.mnky", "w") as file:
