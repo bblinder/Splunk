@@ -11,7 +11,6 @@ import sys
 from collections import Counter
 from datetime import datetime, timedelta
 from pathlib import Path
-from time import sleep
 
 import faker_microservice
 import requests
@@ -42,11 +41,16 @@ def run_signalflow_program(sfx_token, program):
                                stdin=subprocess.PIPE,
                                stdout=subprocess.PIPE,
                                text=True)
-    stdout, stderr = process.communicate(input=program)
+
+    try:
+        stdout, stderr = process.communicate(input=program, timeout=15)
+    except subprocess.TimeoutExpired:
+        logging.error("SignalFlow program took too long to run.")
+        return None
 
     if process.returncode != 0:
         logging.error(f"Error running SignalFlow program: {stderr}")
-        return
+        return None
 
     extracted_values = []
     for line in stdout.splitlines():
@@ -70,25 +74,33 @@ def run_signalflow_program(sfx_token, program):
 
 def cache_signalflow_output(extracted_values):
     """Cache extracted values from SignalFlow output."""
-    with open(SIGNALFLOW_CACHE_FILE, "wb") as cache_file:
-        pickle.dump(
-            {
-                "timestamp": datetime.utcnow(),
-                "extracted_values": extracted_values
-            },
-            cache_file,
-        )
+    try:
+        with open(SIGNALFLOW_CACHE_FILE, "wb") as cache_file:
+            pickle.dump(
+                {
+                    "timestamp": datetime.utcnow(),
+                    "extracted_values": extracted_values
+                },
+                cache_file,
+            )
+    except Exception as e:
+        logging.error(f"Error caching SignalFlow output: {e}")
 
 
 def load_signalflow_output_from_cache():
     """Load extracted values from SignalFlow output cache."""
-    if not Path(SIGNALFLOW_CACHE_FILE).is_file():
+    try:
+        if not Path(SIGNALFLOW_CACHE_FILE).is_file():
+            return None
+        with open(SIGNALFLOW_CACHE_FILE, "rb") as cache_file:
+            cached_data = pickle.load(cache_file)
+        if datetime.utcnow(
+        ) - cached_data["timestamp"] > SIGNALFLOW_CACHE_TIMEOUT:
+            return None
+        return cached_data["extracted_values"]
+    except Exception as e:
+        logging.error(f"Error loading SignalFlow output from cache: {e}")
         return None
-    with open(SIGNALFLOW_CACHE_FILE, "rb") as cache_file:
-        cached_data = pickle.load(cache_file)
-    if datetime.utcnow() - cached_data["timestamp"] > SIGNALFLOW_CACHE_TIMEOUT:
-        return None
-    return cached_data["extracted_values"]
 
 
 def get_service_names(sfx_token, sfx_realm, o11y_environment):
@@ -113,22 +125,30 @@ def get_service_names(sfx_token, sfx_realm, o11y_environment):
     })
     headers = {"Content-Type": "application/json", "X-SF-Token": sfx_token}
 
-    response = requests.post(url, headers=headers, data=payload, timeout=15)
+    try:
+        response = requests.post(url,
+                                 headers=headers,
+                                 data=payload,
+                                 timeout=15)
 
-    if not response.ok:
-        logging.error(f"Error {response.status_code}: {response.text}")
+        if not response.ok:
+            logging.error(f"Error {response.status_code}: {response.text}")
+            return []
+
+        response_data = response.json()
+        logging.info(
+            f"Retrieved {len(response_data['data']['nodes'])} nodes from O11y API."
+        )
+
+        service_names = [
+            node["serviceName"] for node in response_data["data"]["nodes"]
+            if node["type"] == "service"
+        ]
+        return service_names
+
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Error retrieving service names from O11y API: {e}")
         return []
-
-    response_data = response.json()
-    logging.info(
-        f"Retrieved {len(response_data['data']['nodes'])} nodes from O11y API."
-    )
-
-    service_names = [
-        node["serviceName"] for node in response_data["data"]["nodes"]
-        if node["type"] == "service"
-    ]
-    return service_names
 
 
 def cache_service_names(service_names):
@@ -204,11 +224,15 @@ def write_demomonkey_config(service_names,
         replacements = "\n".join(
             f"{service} = {microservice}"
             for service, microservice in service_microservice_map.items())
-        domain_line = f"; $domain=//Set the main domain of your prospect. This will be used in the User Experience Section"
+        domain_line = "; $domain=//Set the main domain of your prospect. This will be used in the User Experience Section"
 
     if extracted_values:
-        extracted_values_line = "\n".join(f"; {value}"
-                                          for value in extracted_values)
+        if base_domain:
+            extracted_values_line = "\n".join(f"; {value} = $domain/<url/path>"
+                                              for value in extracted_values)
+        else:
+            extracted_values_line = "\n".join(f"; {value} = </url/path>"
+                                              for value in extracted_values)
     else:
         extracted_values_line = ""
 
@@ -228,8 +252,8 @@ def write_demomonkey_config(service_names,
 
 {replacements}
 
-; Top RUM workflow names from SignalFlow (use command/ctrl + "/" to bulk uncomment).
-; Can be matched with prospect domains/URL paths.
+;; Top RUM workflow names from SignalFlow (use command/ctrl + "/" to bulk uncomment).
+;; Can be matched with prospect domains/URL paths.
 
 {extracted_values_line}
 """
