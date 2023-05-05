@@ -27,21 +27,21 @@ options:
   --token TOKEN         SignalFx API token (optional if using environment
                         variable SFX_TOKEN)
   --environment ENVIRONMENT
-                        Observability environment (e.g. pmrum-shop)
+                        Observability Cloud environment (e.g. pmrum-shop)
   -d BASE_DOMAIN, --base-domain BASE_DOMAIN
                         Base domain for the fake microservices (e.g.
                         splunk.com). Blank by default.
 ```
 
-By default, the service names retrieved via API are cached for 10 minutes.
+By default, the service names and RUM workflow names retrieved via API/SignalFlow are cached for 10 minutes.
 
 ## Usage
 
 ### Setting up our environment
 1. Clone this repo: `git clone https://github.com/bblinder/Splunk.git`
 2. `cd Splunk/DemoMonkey-Gen`
-3. Run `python3 -m venv venv`
-4. Run `source venv/bin/activate`
+3. `python3 -m venv venv`
+4. `source venv/bin/activate`
 
 ### Installing dependencies
 
@@ -53,15 +53,15 @@ By default, the service names retrieved via API are cached for 10 minutes.
 
 Once dependencies are installed, you can run the script. You’ll need the following arguments:
 
-- `--token`: your O11y Cloud token with API permissions
-- `--environment`: your Org environment (ex: `pmrum-shop`)
-- `--realm`: (**Optional**). The O11y realm corresponding to your org. Defaults to `us0`.
-- `-d`/`--base-domain`: (**Optional**). The domain name of your prospect (ex: `splunk.com`). If provided, will be included in the full Microservice name.
+- `--token`: your O11y Cloud token with API permissions enabled.
+- `--environment`: your O11y Cloud environment (ex: `pmrum-shop`).
+- `--realm`: (**Optional**). The O11y realm corresponding to your Org. Defaults to `us0`.
+- `-d`/`--base-domain`: (**Optional**). The domain name of your prospect (ex: `splunk.com`). If provided, will be included in the full microservice name
 
 Example:
 
 ```bash
-python3 generate_demomonkey.py --realm us0 --environment bblinderman --token xxxxxxx -d splunk.com     
+python3 generate_demomonkey.py --realm us0 --environment bblinderman --token xxxxxxx -d splunk.com
 ```
 
 You should see an output like this:
