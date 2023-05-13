@@ -75,7 +75,7 @@ You should see an output like this:
 
 Look for a configuration file called `demomonkey_config.mnky`. The script should output the full path to the config file.
 
-You can upload it directly to DemoMonkey, or copy/paste its contents. A quick way to do this is via `pbcopy` on MacOS:
+You can upload it directly to DemoMonkey, or copy/paste its contents: the script automatically copies the output to your clipboard (via `pyperclip`). Alternatatively, you can also do this is via `pbcopy` on MacOS:
 
 ```bash
 cat demomonkey_config.mnky | pbcopy
