@@ -1,3 +1,4 @@
 Faker
 faker-microservice
 requests
+pyperclip

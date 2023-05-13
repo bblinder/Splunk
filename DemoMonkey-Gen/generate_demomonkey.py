@@ -8,6 +8,7 @@ import pickle
 import re
 import subprocess
 import sys
+import pyperclip as pc
 from collections import Counter
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -293,6 +294,9 @@ def main(realm, token, environment, base_domain=None):
 
     with open(demomonkey_config_file, "r") as file:
         demomonkey_config = file.read()
+        # copy demomonkey_config to clipboard
+        pc.copy(demomonkey_config)
+        logging.info("DemoMonkey config copied to clipboard.")
 
     return service_names
 
