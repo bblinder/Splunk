@@ -2,3 +2,4 @@ Faker
 faker-microservice
 requests
 streamlit
+pyperclip
