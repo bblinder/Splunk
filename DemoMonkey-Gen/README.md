@@ -70,7 +70,7 @@ This will start a local web server and open a browser window. You should see a s
 
 ![](images%2F2023-06-20%20at%2016.33.57.png)
 
-You can then select a template from the dropdown menu, or provide your own values. If providing your own values, enter them and click on the `Generate` button. This will generate a DemoMonkey config file with random microservices names.
+You can then select a template from the dropdown menu, or provide your own values. If providing your own values, enter them and click on the `Generate` button. This will generate a DemoMonkey config file with random microservices names and automatically copy it to your clipboard.
 
 
 ### Running the CLI tool
