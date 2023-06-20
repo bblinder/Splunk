@@ -45,9 +45,8 @@ By default, the service names and RUM workflow names retrieved via API/SignalFlo
 
 ### Installing dependencies
 
-1. Install dependencies: `pip3 install -r requirements.txt --upgrade`
+1. Install dependencies: `./setup.sh`
 
-2. Install the latest version of the SignalFlow CLI: `pip3 install git+https://github.com/signalfx/signalflow-cli`
 
 ### Running the script
 

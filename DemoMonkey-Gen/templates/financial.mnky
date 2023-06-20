@@ -1,0 +1,33 @@
+; [Options]
+; ; This configuration is set to run on all websites with a wildcard pattern
+; @include[] = /^https?.*$/
+
+; [Replacements]
+
+[Options]
+@include[] = /^https?://.*signalfx\.com/.*$/
+!querySelector(.platform-notification-message-error , style.display) = none
+@namespace[] = splunk
+
+[Variables]
+; $domain=//Set the main domain of your prospect. This will be used in the User Experience Section
+
+frontend= Banks Login
+cartservice = check deposit
+checkoutservice=  account details
+paymentservice = transfer money
+ButtercupPayments = Logout
+productcatalogservice = Investment Options
+currencyservice = validation service
+adservice = credit card service
+emailservice = BillPay
+pmrum-shop = Banking Application
+hipster-shop-demo = Banking Application
+ms = sec
+cart = check deposit
+RUM Mobile Demo App = Banking App
+pmrum2= Mobile
+o11ystore = Mobilebank
+sec = min
+µs = sec
+

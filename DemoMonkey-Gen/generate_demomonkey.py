@@ -73,14 +73,15 @@ def run_signalflow_program(sfx_token, program):
     return top_workflow_names
 
 
-def cache_signalflow_output(extracted_values):
+def cache_signalflow_output(extracted_values, o11y_environment):
     """Cache extracted values from SignalFlow output."""
     try:
         with open(SIGNALFLOW_CACHE_FILE, "wb") as cache_file:
             pickle.dump(
                 {
                     "timestamp": datetime.utcnow(),
-                    "extracted_values": extracted_values
+                    "extracted_values": extracted_values,
+                    "environment": o11y_environment,
                 },
                 cache_file,
             )
@@ -88,7 +89,7 @@ def cache_signalflow_output(extracted_values):
         logging.error(f"Error caching SignalFlow output: {e}")
 
 
-def load_signalflow_output_from_cache():
+def load_signalflow_output_from_cache(o11y_environment):
     """Load extracted values from SignalFlow output cache."""
     try:
         if not Path(SIGNALFLOW_CACHE_FILE).is_file():
@@ -96,7 +97,8 @@ def load_signalflow_output_from_cache():
         with open(SIGNALFLOW_CACHE_FILE, "rb") as cache_file:
             cached_data = pickle.load(cache_file)
         if datetime.utcnow(
-        ) - cached_data["timestamp"] > SIGNALFLOW_CACHE_TIMEOUT:
+        ) - cached_data["timestamp"] > SIGNALFLOW_CACHE_TIMEOUT or cached_data[
+                "environment"] != o11y_environment:
             return None
         return cached_data["extracted_values"]
     except Exception as e:
@@ -152,23 +154,25 @@ def get_service_names(sfx_token, sfx_realm, o11y_environment):
         return []
 
 
-def cache_service_names(service_names):
+def cache_service_names(service_names, o11y_environment):
     """Cache service names to a file."""
     with open(CACHE_FILE, "wb") as cache_file:
         pickle.dump(
             {
                 "timestamp": datetime.utcnow(),
-                "service_names": service_names
+                "service_names": service_names,
+                "environment": o11y_environment,
             }, cache_file)
 
 
-def load_service_names_from_cache():
+def load_service_names_from_cache(o11y_environment):
     """Load service names from cache"""
     if not Path(CACHE_FILE).is_file():
         return None
     with open(CACHE_FILE, "rb") as cache_file:
         cached_data = pickle.load(cache_file)
-    if datetime.utcnow() - cached_data["timestamp"] > CACHE_TIMEOUT:
+    if datetime.utcnow() - cached_data["timestamp"] > CACHE_TIMEOUT or cached_data[
+            "environment"] != o11y_environment:
         return None
     return cached_data["service_names"]
 
@@ -267,26 +271,26 @@ def write_demomonkey_config(service_names,
 
 
 def main(realm, token, environment, base_domain=None):
-    service_names = load_service_names_from_cache()
+    service_names = load_service_names_from_cache(environment)
 
     if service_names:
         logging.info("Using cached service names.")
     else:
         service_names = get_service_names(token, realm, environment)
-        cache_service_names(service_names)
+        cache_service_names(service_names, environment)
 
     if not service_names:
         logging.error("No service names retrieved.")
         return
 
-    extracted_values = load_signalflow_output_from_cache()
+    extracted_values = load_signalflow_output_from_cache(environment)
 
     if extracted_values:
         logging.info("Using cached SignalFlow output.")
     else:
         program = PROGRAM
         extracted_values = run_signalflow_program(token, program)
-        cache_signalflow_output(extracted_values)
+        cache_signalflow_output(extracted_values, environment)
 
     demomonkey_config_file = write_demomonkey_config(service_names,
                                                      base_domain,
@@ -298,7 +302,8 @@ def main(realm, token, environment, base_domain=None):
         pc.copy(demomonkey_config)
         logging.info("DemoMonkey config copied to clipboard.")
 
-    return service_names
+    #return service_names
+    return demomonkey_config_file
 
 
 if __name__ == "__main__":
