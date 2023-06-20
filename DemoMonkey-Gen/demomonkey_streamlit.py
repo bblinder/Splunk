@@ -20,7 +20,7 @@ else:
     # Input fields
     realm = st.sidebar.text_input("O11y Realm", "us1")
     token = st.sidebar.text_input("O11y Token", "", type="password")
-    environment = st.sidebar.text_input("Demo Environment (RUM)", "")
+    environment = st.sidebar.text_input("Demo Environment", "")
     base_domain = st.sidebar.text_input("Base Domain (optional)", "")
 
     # Run button
