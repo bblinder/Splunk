@@ -1,0 +1,5 @@
+"E = (C).publish(label='E', enable=False)"
+"A = data('rum.workflow.count', filter=filter('workflow.name', '*')).sum(by=['workflow.name']).publish(label='A', enable=False)"
+"B = data('rum.workflow.time.ns.p75', filter=filter('workflow.name', '*'), rollup='average').mean(by=['sf_operation']).top(count=30).publish(label='B')"
+"C = (B/1000000000).percentile(pct=75, by=['workflow.name']).publish(label='C', enable=False)"
+"D = (A*C).publish(label='D', enable=False)"
