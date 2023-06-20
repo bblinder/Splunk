@@ -312,7 +312,7 @@ if __name__ == "__main__":
         "Generate DemoMonkey config with SignalFx service names and custom domain names"
     )
     parser.add_argument("--realm",
-                        default="us0",
+                        default="us1",
                         help="SignalFx realm (e.g. us0, us1, etc.)")
     parser.add_argument(
         "--token",

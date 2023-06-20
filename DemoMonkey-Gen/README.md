@@ -2,7 +2,9 @@
 
 A tool to rapidly create tailored static demos for prospects, using DemoMonkey.
 
-The Python script generates a DemoMonkey configuration file, using existing APM service names retrieved via the [Service Topology API](https://dev.splunk.com/observability/reference/api/apm_service_topology/latest), and replaces them with randomly generated fake microservices.
+The Python utility generates a DemoMonkey configuration file, using existing APM service names retrieved via the [Service Topology API](https://dev.splunk.com/observability/reference/api/apm_service_topology/latest), and replaces them with randomly generated fake microservices.
+
+Additionally, the application provides a Web interface (via Streamlit) where users can select existing templates, or generate a config file based on user inputs.
 
 ## Requirements
 
@@ -10,10 +12,22 @@ The Python script generates a DemoMonkey configuration file, using existing APM 
 - [DemoMonkey](https://chrome.google.com/webstore/detail/demomonkey/jgbhioialphpgjgofopnplfibkeehgjd) (Chrome extension)
 - [Splunk Observability Cloud token](https://docs.splunk.com/Observability/admin/authentication-tokens/tokens.html#nav-Create-and-manage-authentication-tokens), with **API permissions enabled**
 - [The SignalFlow CLI](https://github.com/signalfx/signalflow-cli)
+- [Streamlit](https://streamlit.io/)
+
+## Available Templates
+
+| Template  | Documentation/Scripts |
+| ------------- | ------------- |
+| Energy  | TBD |
+| FSI Investment Banking  | [Docs](https://docs.google.com/document/d/1nLQFvKBgLAz7HweonBoHoFJcE88BdbHEgm4mov5ZdLQ/edit)  |
+| Private Banking | TBD  |
+
 
 ## Overview
 
-The tool’s available options can be shown by running `python3 generate_demomonkey.py -h`:
+The tool can either be run via a **Web app** (Streamlit) or via the **command line**.
+
+The CLI tool’s available options can be shown by running `python3 generate_demomonkey.py -h`:
 
 ```bash
 usage: generate_demomonkey.py [-h] [--realm REALM] [--token TOKEN]
@@ -48,13 +62,24 @@ By default, the service names and RUM workflow names retrieved via API/SignalFlo
 1. Install dependencies: `./setup.sh`
 
 
-### Running the script
+### Running the Web app (Streamlit)
+
+1. `streamlit run demomonkey_streamlit.py`
+
+This will start a local web server and open a browser window. You should see a screen like this:
+
+![](images%2F2023-06-20%20at%2016.33.57.png)
+
+You can then select a template from the dropdown menu, or provide your own values. If providing your own values, enter them and click on the `Generate` button. This will generate a DemoMonkey config file with random microservices names.
+
+
+### Running the CLI tool
 
 Once dependencies are installed, you can run the script. You’ll need the following arguments:
 
-- `--token`: your O11y Cloud token with API permissions enabled.
+- `--token`: your O11y Cloud token with API permissions enabled (**optional**: you can also set the `SFX_TOKEN` environment variable).
 - `--environment`: your O11y Cloud environment (ex: `pmrum-shop`).
-- `--realm`: (**Optional**). The O11y realm corresponding to your Org. Defaults to `us0`.
+- `--realm`: (**Optional**). The O11y realm corresponding to your Org. Defaults to `us1`.
 - `-d`/`--base-domain`: (**Optional**). The domain name of your prospect (ex: `splunk.com`). If provided, will be included in the full microservice name
 
 Example:
@@ -95,3 +120,9 @@ Your demo should go from looking like this:
 To this:
 
 ![](images/2023-04-26%20at%2011.41.39.png)
+
+
+## TODO
+
+- Fix the `--token` argument for the CLI. Currently, it doesn’t work if you pass in a token via the command line. You need to set the `SFX_TOKEN` environment variable instead.
+- Use the `signalflow` Python library instead of the CLI. This will make the script more portable.
