@@ -1,0 +1,28 @@
+[Options]
+; Script only run on the demo environments by default
+; production, shipping, distribution, inventory, billing
+@include[] = /^https?://.*signalfx\.com/.*$/
+
+[Variables]
+; $domain=//Set the main domain of your prospect.
+
+authorization=Admin?
+adservice=consumerService
+Buttercup=WellsFargo
+productcatalogservice=inStockService
+checkoutservice=deliveryService
+ColtEmailService=Settlements
+emailservice=inventoryEmail
+outboundEmails=emailsOutbound
+mysql=sap
+redis=sapBillingModule
+list_products=GoodsRequestSubmitted
+paymentservice=paymentService
+PeachPay=WellsFargo
+PwnyPostalService=DeliverGoods
+Wearable=Office
+GPS=Tablet
+Cart=Account
+cart=account
+Balance=Account
+
