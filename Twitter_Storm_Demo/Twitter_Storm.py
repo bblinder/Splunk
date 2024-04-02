@@ -1,6 +1,19 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+"""
+Variables to set:
+    REALM: The SignalFx realm to use (e.g. us0, us1, etc.) Defaults to us0.
+    SIGNALFX_ORG_ACCESS_TOKEN: The SignalFx organization access token.
+
+Variables should be set in the .env file or as environment variables.
+Don't hardcode them in the script!
+
+Example:
+    `export REALM=us0`
+    `export SIGNALFX_ORG_ACCESS_TOKEN=<SignalFx Org Access Token>`
+"""
+
 import os
 import random
 from time import sleep
@@ -16,7 +29,7 @@ WORDS = [word.strip() for word in open("words.txt").readlines()]
 TWEETS = [tweet.strip().replace("'", "") for tweet in open("Tweets.txt").readlines()]
 
 class Config:
-    REALM = os.getenv("REALM", "us0")
+    REALM = os.getenv("REALM", "us0") # Default to us0 if not set
     SIGNALFX_ORG_ACCESS_TOKEN = os.getenv("SIGNALFX_ORG_ACCESS_TOKEN")
     if not SIGNALFX_ORG_ACCESS_TOKEN:
         raise ValueError("SIGNALFX_ORG_ACCESS_TOKEN must be set as an environment variable.")
