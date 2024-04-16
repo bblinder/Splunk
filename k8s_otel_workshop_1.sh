@@ -4,6 +4,11 @@ set -Eeuo pipefail
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 
+die() {
+  echo "Error: $1" >&2
+  exit 1
+}
+
 usage() {
   cat <<EOF
 Usage: $(basename "${BASH_SOURCE[0]}") [-h] [-v] [-c]
