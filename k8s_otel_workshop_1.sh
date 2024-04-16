@@ -90,6 +90,10 @@ setup_name_resolution() {
   # Add the minikube IP address to /etc/hosts
   echo -e "$minikube_ip\tminikube" | sudo tee --append /etc/hosts || die "Failed to add minikube IP to /etc/hosts"
 
+  # adding a sleep to allow the DNS entry to propagate
+  echo -e "Waiting for DNS entry to propagate..."
+  sleep 5
+
   # Test our new name resolution
   nslookup minikube || die "Failed to resolve minikube hostname"
 }
