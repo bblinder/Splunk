@@ -1,0 +1,33 @@
+[Options]
+; If you don't like this base template click on 'Settings' at the left
+; side and change it to your own needs!
+
+; Gets rid of Errors in the Controller
+!querySelector(.platform-notification-message-error , style.display) = none
+
+; Make the use of appd commands easier by importing the namespace
+@include[] = /^https?://o11y4it-demo-amer.splunk.show/.*$/
+[Application]
+; Write simple replacements like this:
+; Inventory-Services=Self-Service-Portal
+; Insert variables anywhere
+; ECommerce=$prospect Customer Care
+; api.shipping.com=api.$domain
+; Spaces around the = sign are not required, but make the configuration more readable
+
+; Use this URL for the service tree
+; https://o11y4it-demo-amer.splunk.show/en-US/app/itsi/homeview?viewType=service_topology&view=standard&earliest=-24h&latest=now&service=IT%20Infrastructure&service=Consumer%20Website&serviceId=bb36693d-c170-435e-b23d-9ed39db08eb0
+
+; Some data in this demo doesn't populate in the service trees, such as the vmware data, so that is a good usecase for renaming to something as an example and saying something like 'we don't have the specific data for this demo but we have mocked it up.
+
+; Replace GMF with Company Name
+Emirates Group = GMF
+
+; Replace with a service that makes sense
+; Add other service renames if based on the customer. 
+checkoutservice = loginService
+
+; Replace this with something relevant to the customer. 
+VMware vSphere = network
+VMware Virtual Machines = firewall
+VMware ESXi servers = switching
