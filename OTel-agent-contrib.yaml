@@ -17,6 +17,10 @@
 # - SPLUNK_INGEST_URL: The Splunk ingest URL, e.g. https://ingest.us2.signalfx.com
 # - SPLUNK_TRACE_URL: The Splunk trace endpoint URL, e.g. https://ingest.us2.signalfx.com/v2/trace
 
+# - GCP_METRICS_ENDPOINT: The Google Cloud Metrics endpoint URL
+# - GCP_TRACES_ENDPOINT: The Google Cloud Traces endpoint URL
+# - GCP_TOKEN: The Google Cloud authentication token
+
 extensions:
   health_check:
     endpoint: 0.0.0.0:13133
@@ -157,7 +161,7 @@ exporters:
      traces_endpoint: "${GCP_TRACES_ENDPOINT}"
      compression: gzip
      headers:
-       "Google-Token": ""
+       "Google-Token": "${GCP_TOKEN}"
   # Debug
   debug:
     verbosity: detailed
