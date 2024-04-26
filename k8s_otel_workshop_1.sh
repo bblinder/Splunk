@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+# A script to test setup of a minikube environment with audit logging and server name resolution.
+# In the event of an interrupt or error,  it uses a cleanup trap to stop/delete all minikube configurations,
+# the hostname from /etc/hosts, and the audit policy file and directory.
+
 set -Eeuo pipefail
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
