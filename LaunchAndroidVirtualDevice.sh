@@ -22,9 +22,24 @@ if [[ ! -d "$android_SDK_directory" ]] ; then
 fi
 
 # Check if the AVD_DEVICE_NAME environment variable is set
-if [[ -z "${AVD_DEVICE_NAME:-}" ]]; then
-    echo "Error: AVD_DEVICE_NAME environment variable is not set."
+if [[ -z "${1:-}" && -z "${AVD_DEVICE_NAME:-}" ]]; then
+    echo "Error: AVD_DEVICE_NAME is not provided as a command line argument or environmental variable."
     exit 1
+fi
+
+if [[ -n "${1:-}" ]]; then
+    AVD_DEVICE_NAME=$1
+else
+    AVD_DEVICE_NAME=$AVD_DEVICE_NAME
+fi
+
+# Display the help menu
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+    echo "Usage: $0 [AVD_DEVICE_NAME]"
+    echo "Options:"
+    echo "  --help, -h   Display this help menu."
+    echo "  AVD_DEVICE_NAME  The name of the Android Virtual Device to launch."
+    exit 0
 fi
 
 # Launch the emulator
