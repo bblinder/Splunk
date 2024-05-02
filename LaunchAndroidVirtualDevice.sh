@@ -39,6 +39,13 @@ if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
     echo "Options:"
     echo "  --help, -h   Display this help menu."
     echo "  AVD_DEVICE_NAME  The name of the Android Virtual Device to launch."
+    echo "  --list-avds, -l List available AVDs."
+    exit 0
+fi
+
+# List the available AVDs
+if [[ "${1:-}" == "--list-avds" || "${1:-}" == "-l" ]]; then
+    "$android_SDK_directory"/emulator/emulator -list-avds
     exit 0
 fi
 
