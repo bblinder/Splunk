@@ -45,7 +45,7 @@ fi
 
 # List the available AVDs
 if [[ "${1:-}" == "--list-avds" || "${1:-}" == "-l" ]]; then
-    "$android_SDK_directory"/emulator/emulator -list-avds
+    "$android_SDK_directory"/emulator/emulator -list-avds | grep -v 'INFO'
     exit 0
 fi
 
