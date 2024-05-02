@@ -11,50 +11,77 @@
 
 # This has only been tested on Mac OS.
 
+# Usage:
+#   -h, --help         Show this help message and exit.
+#   -l, --list-avds    List available Android Virtual Devices.
+#   [AVD_NAME]         Launch specified Android Virtual Device.
+
 set -Eeuo pipefail
 
-# Check if the script is being run on a Mac
-if [ "$(uname)" != "Darwin" ]; then
-    echo "Error: This script is only meant to be run on Mac OS."
-    exit 1
-fi
+# Default SDK path
+android_SDK_directory="${ANDROID_SDK_ROOT:-/Users/$(whoami)/Library/Android/sdk}"
 
-android_SDK_directory="/Users/$(whoami)/Library/Android/sdk"
-
-# Check if the Android SDK directory exists
-if [[ ! -d "$android_SDK_directory" ]] ; then
-    echo "Error: Android SDK not found at $android_SDK_directory."
-    exit 1
-fi
-
-# Check if the AVD_DEVICE_NAME environment variable is set
-if [[ -z "${1:-}" && -z "${AVD_DEVICE_NAME:-}" ]]; then
-    echo "Error: AVD_DEVICE_NAME is not provided as a command line argument or environmental variable."
-    echo "Use the --list-avds option to list available AVDs."
-    exit 1
-fi
-
-if [[ -n "${1:-}" ]]; then
-    AVD_DEVICE_NAME=$1
-else
-    AVD_DEVICE_NAME=$AVD_DEVICE_NAME
-fi
-
-# Display the help menu
-if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
-    echo "Usage: $0 [AVD_DEVICE_NAME]"
+function print_usage() {
+    echo "Usage: $0 [options] [AVD_NAME]"
     echo "Options:"
-    echo "  --help, -h   Display this help menu."
-    echo "  AVD_DEVICE_NAME  The name of the Android Virtual Device to launch."
-    echo "  --list-avds, -l List available AVDs."
+    echo "  -h                Display this help menu."
+    echo "  -l                List available AVDs."
+}
+
+function list_avds() {
+    "$android_SDK_directory/emulator/emulator" -list-avds | grep -v 'INFO'
     exit 0
+}
+
+function launch_avd() {
+    if [[ -z $1 ]]; then
+        echo "Error: AVD name is required if not listing AVDs."
+        print_usage
+        exit 1
+    fi
+    "$android_SDK_directory/emulator/emulator" -avd "$1" -netdelay none -netspeed full
+    exit 0
+}
+
+function check_dependencies() {
+    if [[ ! -x "$(command -v grep)" ]]; then
+        echo "Error: grep is not installed."
+        exit 1
+    fi
+    if [[ ! -d "$android_SDK_directory" || ! -x "$android_SDK_directory/emulator/emulator" ]]; then
+        echo "Error: Android SDK or emulator not correctly set at $android_SDK_directory."
+        exit 1
+    fi
+}
+
+OPTIND=1
+while getopts "hl" opt; do
+    case "$opt" in
+        h)
+            print_usage
+            exit 0
+            ;;
+        l)
+            list_avds
+            ;;
+        \?)
+            print_usage
+            exit 1
+            ;;
+    esac
+done
+shift $((OPTIND -1))
+
+check_dependencies
+
+# Check if an AVD name is provided as argument or environment variable
+if [[ -z "${1:-}" && -z "${AVD_DEVICE_NAME:-}" ]]; then
+    echo "Error: No AVD name provided."
+    print_usage
+    exit 1
 fi
 
-# List the available AVDs
-if [[ "${1:-}" == "--list-avds" || "${1:-}" == "-l" ]]; then
-    "$android_SDK_directory"/emulator/emulator -list-avds | grep -v 'INFO'
-    exit 0
-fi
+# Use command line argument as AVD name or fallback to environment variable
+AVD_NAME="${1:-$AVD_DEVICE_NAME}"
 
-# Launch the emulator
-"$android_SDK_directory"/emulator/emulator -avd $AVD_DEVICE_NAME -netdelay none -netspeed full
+launch_avd "$AVD_NAME"
