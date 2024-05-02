@@ -3,6 +3,12 @@
 # Programatically launching an emulated android device without the need for booting up Android Studio.
 # Assumes you have the Android SDK/platform tools installed alongside Android Studio.
 
+# How to install Android SDK/Platform tools:
+# `brew install android-platform-tools`
+
+# Info on setting up Android Virtual Devices (AVDs) can be found here:
+# https://developer.android.com/studio/run/managing-avds
+
 # This has only been tested on Mac OS.
 
 set -Eeuo pipefail
@@ -24,6 +30,7 @@ fi
 # Check if the AVD_DEVICE_NAME environment variable is set
 if [[ -z "${1:-}" && -z "${AVD_DEVICE_NAME:-}" ]]; then
     echo "Error: AVD_DEVICE_NAME is not provided as a command line argument or environmental variable."
+    echo "Use the --list-avds option to list available AVDs."
     exit 1
 fi
 
