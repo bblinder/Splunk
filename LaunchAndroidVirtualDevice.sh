@@ -3,12 +3,6 @@
 # Programatically launching an emulated android device without the need for booting up Android Studio.
 # Assumes you have the Android SDK/platform tools installed alongside Android Studio.
 
-# How to install Android SDK/Platform tools:
-# `brew install android-platform-tools`
-
-# Info on setting up Android Virtual Devices (AVDs) can be found here:
-# https://developer.android.com/studio/run/managing-avds
-
 # This has only been tested on Mac OS.
 
 # Usage:
@@ -26,6 +20,24 @@ function print_usage() {
     echo "Options:"
     echo "  -h                Display this help menu."
     echo "  -l                List available AVDs."
+    echo "  -i                Install Android SDK platform tools if not installed."
+    echo "  -s                Setup an AVD (requires manual input)."
+}
+
+function install_sdk() {
+    if ! command -v brew &>/dev/null; then
+        echo "Homebrew is not installed. Please install Homebrew first."
+        exit 1
+    fi
+    echo "Installing Android SDK platform tools..."
+    brew install --cask android-platform-tools
+    echo "Android SDK platform tools installed."
+}
+
+function setup_avd() {
+    echo "Setting up Android Virtual Device..."
+    echo "Please follow the instructions here: https://developer.android.com/studio/run/managing-avds"
+    open "https://developer.android.com/studio/run/managing-avds"
 }
 
 function list_avds() {
@@ -55,7 +67,7 @@ function check_dependencies() {
 }
 
 OPTIND=1
-while getopts "hl" opt; do
+while getopts "hlis" opt; do
     case "$opt" in
         h)
             print_usage
@@ -63,6 +75,14 @@ while getopts "hl" opt; do
             ;;
         l)
             list_avds
+            ;;
+        i)
+            install_sdk
+            exit 0
+            ;;
+        s)
+            setup_avd
+            exit 0
             ;;
         \?)
             print_usage
