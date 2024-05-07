@@ -382,4 +382,5 @@ fi
 #
 # Environment ready foir FW2
 #
-echo "Environmnet ready for foundational workshop #2"
+date_string="$(date)"
+echo "** $date_string - Environment ready for foundational workshop #2"
