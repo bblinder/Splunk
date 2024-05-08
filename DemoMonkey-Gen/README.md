@@ -123,6 +123,4 @@ To this:
 
 
 ## TODO
-
-- Fix the `--token` argument for the CLI. Currently, it doesn’t work if you pass in a token via the command line. You need to set the `SFX_TOKEN` environment variable instead.
 - Use the `signalflow` Python library instead of the CLI. This will make the script more portable.
