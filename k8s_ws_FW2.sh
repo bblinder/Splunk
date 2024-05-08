@@ -1,272 +1,214 @@
 #!/bin/bash
 #
 # Foundational Workshop #1 Tasks - Linux Ubuntu NOVA instance
-#
 # The following script sets all components for a kubernetes | otel workshop and sets up
 # participants to start running Foundational Workshop #2
 #
-# author:  Franco Ferrero-Poschetto
-# title:   Staff Solutions Engineer, Splunk
+# author: Franco Ferrero-Poschetto
+# title: Staff Solutions Engineer, Splunk
 #
-# version: 1.0.0
+# revisions: Brandon Blinderman
+# title: Senior Solutions Architect, Splunk
 #
-# What this script does:
-#  - Foundational Workshop #1
-#      - sets up all environment variables - public_ip, hostname, etc
-#      - downloads | installs minikube
-#      - downloads | installs kubectl
-#      - configures docker for the splunk user
-#      - downloads | build | containerizes the petclinic java application
+# version: 1.1.0
+# Changelog: implementing more robust setup with error handling, function usage, and checks for idempotency.
 #
+# TODO: implement function to undo all changes
+
+set -uo pipefail # bash strict mode
+
+# check that OS is linux
+if [[ "$(uname -s)" != "Linux" ]]; then
+  echo "This script is intended to be run on a Linux system" >&2
+  exit 1
+fi
+
+
+# Prints log messages with timestamps and colors
+log() {
+  local color=${3:-"white"}
+  case $color in
+    "green") color=2;;
+    "red") color=1;;
+    *) color=7;; # default is white
+  esac
+  echo -e "$(tput setaf $color)::: $(date +%F\ %T) - Workshop Setup Step: $2$(tput sgr0)"
+}
+
+# handles errors and exits the script
+error_exit() {
+  local line=$1
+  local message=${2:-"An unspecified error occurred"}
+  local status=$?
+  local command=$BASH_COMMAND
+  echo "::: ERROR [Line $line]: Command '$command' exited with status $status. $message" >&2
+  echo "::: $(date +%F\ %T) - ERROR [Line $line]: Command '$command' exited with status $status. $message" >> ~/debug.txt
+  exit $status
+}
+
+# Ensure necessary tools are installed
+ensure_tools_installed() {
+  local line=$1
+  local tools=("curl" "git" "snapd" "dpkg" "sudo" "tee" "apt" "ec2metadata")
+  for tool in "${tools[@]}"; do
+    if ! command -v "$tool" &>/dev/null; then
+      log "$line" "Installing $tool"
+      sudo apt-get install "$tool" -y &>/dev/null || error_exit "$line" "Failed to install $tool"
+    fi
+  done
+}
+
 # Global variables
 export WORKSHOP_NUM=1
 export WS_USER="demo"
 export LOCAL_IP=$(ec2metadata --local-ipv4)
-#export PUBLIC_IP=$(ec2metadata --local-ipv4)
-sleep 1
-#
-# make sure we are in our home directory
-date_string="$(date)"
-echo -n "** $date_string - $WORKSHOP_NUM step - os: change to home directory"
-echo "** $date_string - $WORKSHOP_NUM step - os: change to home directory" >> ~/debug.txt
-cd ~/; sleep 1
-if [ $? = 0 ]; then
-echo " .... done"
+
+# Apt update
+log ${LINENO} "Updating apt..."
+sudo apt update -y &>/dev/null || error_exit ${LINENO} "Failed to update apt"
+
+# Check for necessary tools
+log ${LINENO} "Checking and installing necessary tools..."
+ensure_tools_installed ${LINENO}
+
+# # Check if running as root
+# if [[ $EUID -ne 0 ]]; then
+#     error_exit ${LINENO} "This script must be run as root"
+# fi
+
+# Start of the main script
+log ${LINENO} "Changing to home directory"
+cd ~/ || error_exit ${LINENO} "Failed to change to home directory"
+
+# Install Java
+if dpkg -s "openjdk-17-jre" &>/dev/null; then
+  log ${LINENO} "Java is already installed"
 else
-echo " .... failed"
+  log ${LINENO} "Installing Java..."
+  sudo apt install openjdk-17-jre -y &>/dev/null || error_exit ${LINENO} "Failed to install Java"
 fi
-#
-# Install java
-#
-date_string="$(date)"
-echo -n "** $date_string - $WORKSHOP_NUM step - os: installing java"
-echo "** $date_string - $WORKSHOP_NUM step - os: installing java" >> ~/debug.txt
-result="$(sudo apt install openjdk-17-jre -y &> /tmp/k8s_output.txt)"; sleep 1
-if [ $? = 0 ]; then
-echo " .... done"
+
+# Install Minikube
+if command -v minikube &>/dev/null; then
+  log ${LINENO} "Minikube is already installed"
 else
-echo " .... failed"
+  log ${LINENO} "Installing Minikube..."
+  sudo curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube_latest_amd64.deb &>/dev/null || error_exit ${LINENO} "Failed to download Minikube"
+  sudo dpkg -i minikube_latest_amd64.deb &>/dev/null || error_exit ${LINENO} "Failed to install Minikube"
 fi
-#
-# Install minikube
-#
-date_string="$(date)"
-echo -n "** $date_string - $WORKSHOP_NUM step - os: installing minikube"
-echo "** $date_string - $WORKSHOP_NUM step - os: installing minikube" >> ~/debug.txt
-result="$(curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube_latest_amd64.deb &> /tmp/k8s_output.txt)"; sleep 1
-#
-result="$(sudo dpkg -i minikube_latest_amd64.deb &> /tmp/k8s_output.txt)"; sleep 1
-if [ $? = 0 ]; then
-echo " .... done"
-else
-echo " .... failed"
-fi
-#
+
 # Install kubectl
-#
-date_string="$(date)"
-echo -n "** $date_string - $WORKSHOP_NUM step - os: installing kubectl"
-echo "** $date_string - $WORKSHOP_NUM step - os: installing kubectl" >> ~/debug.txt
-result="$(sudo snap install kubectl --classic &> /tmp/k8s_output.txt)"; sleep 1
-if [ $? = 0 ]; then
-echo " .... done"
+if command -v kubectl &>/dev/null; then
+  log ${LINENO} "kubectl is already installed"
 else
-echo " .... failed"
+  log ${LINENO} "Installing kubectl..."
+  sudo snap install kubectl --classic &>/dev/null || error_exit ${LINENO} "Failed to install kubectl"
 fi
-#
-# Install helm
-#
-date_string="$(date)"
-echo -n "** $date_string - $WORKSHOP_NUM step - os: installing helm"
-echo "** $date_string - $WORKSHOP_NUM step - os: installing helm" >> ~/debug.txt
-result="$(sudo snap install helm --classic &> /tmp/k8s_output.txt)"; sleep 1
-if [ $? = 0 ]; then
-echo " .... done"
+
+# Install Helm
+if command -v helm &>/dev/null; then
+  log ${LINENO} "Helm is already installed"
 else
-echo " .... failed"
+  log ${LINENO} "Installing Helm..."
+  sudo snap install helm --classic &>/dev/null || error_exit ${LINENO} "Failed to install Helm"
 fi
-#
-# Install docker
-#
-date_string="$(date)"
-echo -n "** $date_string - $WORKSHOP_NUM step - os: installing docker"
-echo "** $date_string - $WORKSHOP_NUM step - os: installing docker" >> ~/debug.txt
-result="$(sudo apt install docker.io -y &> /tmp/k8s_output.txt)"; sleep 1
-if [ $? = 0 ]; then
-echo " .... done"
+
+# Install Docker
+if command -v docker &>/dev/null; then
+  log ${LINENO} "Docker is already installed"
 else
-echo " .... failed"
+  log ${LINENO} "Installing Docker..."
+  sudo apt install docker.io -y &>/dev/null || error_exit ${LINENO} "Failed to install Docker"
 fi
-#
+
 # Adding docker permissions to current user
-#
-date_string="$(date)"
-echo -n "** $date_string - $WORKSHOP_NUM step - os: adding docker permissions to the current user"
-echo "** $date_string - $WORKSHOP_NUM step - os: adding docker permissions to the current user" >> ~/debug.txt
-result="$(sudo usermod -aG docker ${USER} &> /tmp/k8s_output.txt)"; sleep 1
-result="$(sudo chmod 666 /var/run/docker.sock &> /tmp/k8s_output.txt)"; sleep 1
-if [ $? = 0 ]; then
-echo " .... done"
-else
-echo " .... failed"
-fi
-#
-# configure minikube driver as docker
-#
-date_string="$(date)"
-echo -n "** $date_string - $WORKSHOP_NUM step - os: configure minikube driver as docker"
-echo "** $date_string - $WORKSHOP_NUM step - os: configure minikube driver as docker" >> ~/debug.txt
-result="$(minikube config set driver docker &> /tmp/k8s_output.txt)"; sleep 1
-if [ $? = 0 ]; then
-echo " .... done"
-else
-echo " .... failed"
-fi
-#
-# Delete minikube
-#
-date_string="$(date)"
-echo -n "** $date_string - $WORKSHOP_NUM step - os: delete minikube"
-echo "** $date_string - $WORKSHOP_NUM step - os: delete minikube" >> ~/debug.txt
-result="$(minikube delete &> /tmp/k8s_output.txt)"; sleep 1
-if [ $? = 0 ]; then
-echo " .... done"
-else
-echo " .... failed"
-fi
-#
-# Start minikube with docker driver
-#
-date_string="$(date)"
-echo -n "** $date_string - $WORKSHOP_NUM step - os: Start minikube with docker driver"
-echo "** $date_string - $WORKSHOP_NUM step - os: Start minikube with docker driver" >> ~/debug.txt
-result="$(minikube start --no-vtx-check --driver=docker --subnet=192.168.49.0/24 &> /tmp/k8s_output.txt)"; sleep 1
-if [ $? = 0 ]; then
-echo " .... done"
-else
-echo " .... failed"
-fi
-#
+log ${LINENO} "Adding docker permissions to current user..."
+sudo usermod -aG docker "${USER}" &>/dev/null || error_exit ${LINENO} "Failed to modify docker user group"
+sudo chmod 666 /var/run/docker.sock &>/dev/null || error_exit ${LINENO} "Failed to change docker socket permissions"
+
+# Configure minikube driver to docker
+log ${LINENO} "Configuring minikube driver to docker..."
+minikube config set driver docker &>/dev/null || error_exit ${LINENO} "Failed to set Minikube driver"
+
+# delete minikube cluster
+log ${LINENO} "Deleting minikube cluster"
+minikube delete &>/dev/null || error_exit ${LINENO} "Failed to delete Minikube cluster"
+
+# Start minikube cluster with docker driver
+log ${LINENO} "Starting minikube cluster with docker driver..."
+minikube start --no-vtx-check --driver=docker --subnet=192.168.49.0/24 &>/dev/null || error_exit ${LINENO} "Failed to start Minikube cluster"
+
+# sleep for 30 seconds
+log ${LINENO} "Waiting for cluster to spin up..."
 sleep 30
-#
-# Apply a new certificate to minikube
-#
-date_string="$(date)"   
-echo -n "** $date_string - $WORKSHOP_NUM step - os: Apply a new certificate to minikube"
-echo "** $date_string - $WORKSHOP_NUM step - os: Apply a new certificate to minikube" >> ~/debug.txt
-result="$(kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.9.1/cert-manager.yaml &> /tmp/k8s_output.txt)"; sleep 1
-if [ $? = 0 ]; then
-echo " .... done"
-else
-echo " .... failed"
-fi
-#
-# Stop minikube
-#
-date_string="$(date)"
-echo -n "** $date_string - $WORKSHOP_NUM step - os: stop minikube"
-echo "** $date_string - $WORKSHOP_NUM step - os: stop minikube" >> ~/debug.txt
-result="$(minikube stop &> /tmp/k8s_output.txt)"; sleep 1
-if [ $? = 0 ]; then
-echo " .... done"
-else
-echo " .... failed"
-fi
-#
-# Create minikube audit policy
-#
-date_string="$(date)"
-echo -n "** $date_string - $WORKSHOP_NUM step - os: Create minikube audit policy"
-echo "** $date_string - $WORKSHOP_NUM step - os: Create minikube audit policy" >> ~/debug.txt
+
+# apply a new certificate to minikube
+log ${LINENO} "Applying a new certificate to minikube"
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.9.1/cert-manager.yaml &>/dev/null || error_exit ${LINENO} "Failed to apply new certificate to Minikube"
+
+# stop minikube cluster
+log ${LINENO} "Stopping minikube cluster"
+minikube stop &>/dev/null || error_exit ${LINENO} "Failed to stop Minikube cluster"
+
+# create minikube audit policy
+log ${LINENO} "Creating minikube audit policy"
 mkdir -p ~/.minikube/files/etc/ssl/certs
-#
 cat <<EOF > ~/.minikube/files/etc/ssl/certs/audit-policy.yaml
-# Log all requests at the Metadata level.
+# log all requests at the Metadata level.
 apiVersion: audit.k8s.io/v1
 kind: Policy
 rules:
 - level: Metadata
 EOF
-#
-if [ $? = 0 ]; then
-echo " .... done"
-else
-echo " .... failed"
+if [[ $? -ne 0 ]]; then
+  error_exit ${LINENO} "Failed to create minikube audit policy"
 fi
-#
-# Start minikube using the newly created audit_policy.yaml configuration
-#
-date_string="$(date)"
-echo -n "** $date_string - $WORKSHOP_NUM step - os: Start minikube using the newly created audit_policy.yaml configuration"
-echo "** $date_string - $WORKSHOP_NUM step - os: Start minikube using the newly created audit_policy.yaml configuration" >> ~/debug.txt
-result="$(minikube start --no-vtx-check --driver=docker --subnet=192.168.49.0/24 --extra-config=apiserver.audit-policy-file=/etc/ssl/certs/audit-policy.yaml --extra-config=apiserver.audit-log-path=-; eval $(minikube -p minikube docker-env) &> /tmp/k8s_output.txt)"; sleep 1
-if [ $? = 0 ]; then
-echo " .... done"
-else
-echo " .... failed"
-fi
-#
+
+# start minikube with the newly created audit policy
+log ${LINENO} "Starting minikube with the newly created audit policy..."
+minikube start --no-vtx-check --driver=docker --subnet=192.168.49.0/24 --extra-config=apiserver.audit-policy-file=/etc/ssl/certs/audit-policy.yaml --extra-config=apiserver.audit-log-path=- &>/dev/null; eval $(minikube -p minikube docker-env) &>/dev/null || error_exit ${LINENO} "Failed to start Minikube cluster with new audit policy"
+
+# sleep for 30 seconds
+log ${LINENO} "Waiting for minikube cluster to start..."
 sleep 30
-#
-# Add minikube to the /etc/hosts file
-#
-date_string="$(date)"
-echo -n "** $date_string - $WORKSHOP_NUM step - os: Add minikube to the /etc/hosts file"
-echo "** $date_string - $WORKSHOP_NUM step - os: Add minikube to the /etc/hosts file" >> ~/debug.txt
-result="$(echo -e "192.168.49.2\tminikube" | sudo tee --append /etc/hosts &> /tmp/k8s_output.txt)"; sleep 1
-if [ $? = 0 ]; then
-echo " .... done"
-else
-echo " .... failed"
+
+# add minikube to the /etc/hosts file
+log ${LINENO} "Adding minikube to /etc/hosts..."
+minikube_ip=$(minikube ip)
+if [[ -z $minikube_ip ]]; then
+  error_exit ${LINENO} "Failed to get minikube ip address"
 fi
-#
-# Create the workshop directory and install the petclinic app
-#
-date_string="$(date)"
-echo -n "** $date_string - $WORKSHOP_NUM step - os: Create the workshop directory and install the petclinic app"
-echo "** $date_string - $WORKSHOP_NUM step - os: Create the workshop directory and install the petclinic app" >> ~/debug.txt
-mkdir ~/k8s_workshop
-#
-mkdir ~/k8s_workshop/petclinic
-#
-cd ~/k8s_workshop/petclinic
-#
-if [ $? = 0 ]; then
-echo " .... done" 
+# save original /etc/hosts file
+log ${LINENO} "Saving original /etc/hosts file..."
+cat /etc/hosts | sudo tee /etc/hosts.bak &>/dev/null || error_exit ${LINENO} "Failed to save original /etc/hosts file"
+echo -e "$minikube_ip\tminikube" | sudo tee --append /etc/hosts &>/dev/null || error_exit ${LINENO} "Failed to add minikube to /etc/hosts file"
+
+# create the workshop directories and installing the petclinic app
+log ${LINENO} "Creating the workshop directories and installing the petclinic app"
+mkdir -p ~/k8s_workshop/petclinic/k8s_deploy || error_exit ${LINENO} "Failed to create workshop directories"
+cd ~/k8s_workshop/petclinic || error_exit ${LINENO} "Failed to change to petclinic directory"
+
+# download the petclinic app from github
+log ${LINENO} "Downloading the petclinic app from github"
+git -C ~/k8s_workshop/petclinic clone --branch springboot3 https://github.com/spring-projects/spring-petclinic.git &>/dev/null || error_exit ${LINENO} "Failed to download the petclinic app from github"
+
+# use MAVEN to build the petclinic app
+log ${LINENO} "Using MAVEN to build the petclinic app... this may take a while..."
+cd ~/k8s_workshop/petclinic/spring-petclinic || error_exit ${LINENO} "Failed to change to petclinic directory"
+
+# Run the build command
+./mvnw package &>/tmp/k8s_output.txt || error_exit ${LINENO} "Failed to build the petclinic app"
+build_status=$?
+
+if [ $build_status -eq 0 ] && grep -q "BUILD SUCCESS" /tmp/k8s_output.txt; then
+  log ${LINENO} "Build completed successfully"
 else
-echo " .... failed"
+  error_exit ${LINENO} "Build did not complete successfully, check /tmp/k8s_output.txt for details"
 fi
-#
-# download petclinic source from github
-date_string="$(date)"
-echo -n "** $date_string - $WORKSHOP_NUM step - petclinic: download petclinic source from github"
-echo "** $date_string - $WORKSHOP_NUM step - petclinic: download petclinic source from github" >> ~/debug.txt
-result="$(git -C ~/k8s_workshop/petclinic clone --branch springboot3 https://github.com/spring-projects/spring-petclinic.git &>> ~/debug.txt)"
-if [ $? = 0 ]; then
-echo " .... done"
-else
-echo " .... failed"
-fi
-#
-# use MAVEN to build a new petclinic package
-date_string="$(date)"
-echo -n "** $date_string - $WORKSHOP_NUM step - petclinic: use MAVEN to build a new petclinic package"
-echo "** $date_string - $WORKSHOP_NUM step - petclinic: use MAVEN to build a new petclinic package" >> ~/debug.txt
-cd ~/k8s_workshop/petclinic/spring-petclinic
-result="$(./mvnw package &> /tmp/k8s_output.txt)"; sleep 1
-cat /tmp/k8s_output.txt >> ~/debug.txt
-result="$(cat /tmp/k8s_output.txt | grep "BUILD SUCCESS" | awk '{print $3}')"; sleep 1
-if [ $result = "SUCCESS" ]; then
-echo " .... done"
-else
-echo " .... failed"
-fi
-#
+
 # create dockerfile in petclinic target directory
-date_string="$(date)"
-echo -n "** $date_string - $WORKSHOP_NUM step - petclinic: create dockerfile in petclinic target directory"
-echo "** $date_string - $WORKSHOP_NUM step - petclinic: create dockerfile in petclinic target directory" >> ~/debug.txt
-sudo tee ~/k8s_workshop/petclinic/spring-petclinic/target/Dockerfile <<EOF >> ~/debug.txt
+log ${LINENO} "Creating dockerfile in petclinic target directory"
+sudo tee ~/k8s_workshop/petclinic/spring-petclinic/target/Dockerfile <<EOF &>/dev/null
 # syntax=docker/dockerfile:1
 
 FROM eclipse-temurin:17-jdk-jammy
@@ -277,44 +219,28 @@ COPY * ./
 
 CMD ["java", "-jar", "spring-petclinic-3.0.0-SNAPSHOT.jar"]
 EOF
-sleep 1
-#
-sudo chown -R splunker:users ~/k8s_workshop; sleep 1
-echo " .... done"
-#
-# build the petclinic docker image into the minikube docker registry
-#
-date_string="$(date)"
-echo -n "** $date_string - $WORKSHOP_NUM step - petclinic: build the petclinic docker image into the minikube docker registry"
-echo "** $date_string - $WORKSHOP_NUM step - petclinic: build the petclinic docker image into the minikube docker registry" >> ~/debug.txt
-#
-result="$(sudo -H -u splunker bash -c "eval \$(minikube -p minikube docker-env); cd ~/k8s_workshop/petclinic/spring-petclinic/target; docker build --tag $WS_USER/petclinic-otel:v1 ." &> /tmp/k8s_output.txt)"; sleep 1
-#
-cat /tmp/k8s_output.txt >> ~/debug.txt
-result="$(cat /tmp/k8s_output.txt | grep "Successfully built" | awk '{print $2}')"; sleep 1
-if [ $result = "built" ]; then
-echo " .... done"
-else
-echo " .... failed"
+
+if [[ $? -ne 0 ]]; then
+  error_exit ${LINENO} "Failed to create dockerfile in petclinic target directory"
 fi
-#
-# create the petclinic k8s_deploy directories
-date_string="$(date)"
-echo -n "** $date_string - $WORKSHOP_NUM step - petclinic: create the petclinic k8s_deploy directories"
-echo "** $date_string - $WORKSHOP_NUM step - petclinic: create the petclinic k8s_deploy directories" >> ~/debug.txt
-#
-mkdir -p ~/k8s_workshop/petclinic/k8s_deploy; sleep 1
-if [ $? = 0 ]; then
-echo " .... done"
+
+# changing ownership of the petclinic directory
+log ${LINENO} "Changing ownership of the petclinic directory"
+sudo chown -R splunker:users ~/k8s_workshop || error_exit ${LINENO} "Failed to change ownership of the petclinic directory"
+
+# build the petclinic docker image
+log ${LINENO} "Building the petclinic docker image"
+result="$(sudo -H -u splunker bash -c "eval \$(minikube -p minikube docker-env); cd ~/k8s_workshop/petclinic/spring-petclinic/target; docker build --tag $WS_USER/petclinic-otel:v1 ." &>/tmp/k8s_output.txt)"
+result="$(grep "Successfully built" /tmp/k8s_output.txt | awk '{print $2}')"
+if [[ "$result" == "built" ]]; then
+  log ${LINENO} "Petclinic docker image built successfully"
 else
-echo " .... failed"
+  log ${LINENO} "Petclinic docker image build failed"
 fi
-#
-# create the manifest file used to deploy the petclinic app into kubernetes
-date_string="$(date)"
-echo -n "** $date_string - $WORKSHOP_NUM step - petclinic: create the manifest file used to deploy the petclinic app into kubernetes"
-echo "** $date_string - $WORKSHOP_NUM step - petclinic: create the manifest file used to deploy the petclinic app into kubernetes" >> ~/debug.txt
-sudo tee ~/k8s_workshop/petclinic/k8s_deploy/$WS_USER-petclinic-k8s-manifest.yml <<EOF >> ~/debug.txt
+
+# create the manifest file for the petclinic deployment
+log ${LINENO} "Creating the manifest file for the petclinic deployment"
+sudo tee ~/k8s_workshop/petclinic/k8s_deploy/$WS_USER-petclinic-k8s-manifest.yml <<EOF &>/dev/null
 apiVersion: v1
 kind: Service
 metadata:
@@ -349,38 +275,19 @@ spec:
         ports:
         - containerPort: 8080
 EOF
-sleep 1
-echo " .... done"
-sudo chown splunker:users ~/k8s_workshop/petclinic/k8s_deploy/$WS_USER-petclinic-k8s-manifest.yml
-#
-# pause for 1 minute(s) to allow petclinic deployment
-#
-date_string="$(date)"
-echo -n "** $date_string - $WORKSHOP_NUM step - petclinic: pause for 1 minute(s) to allow petclinic deployment"
-echo "** $date_string - $WORKSHOP_NUM step - petclinic: pause for 1 minute(s) to allow petclinic deployment" >> ~/debug.txt
-sleep 60
-if [ $? = 0 ]; then
-echo " .... done"
-else
-echo " .... failed"
+if [[ $? -ne 0 ]]; then
+  error_exit ${LINENO} "Failed to create the manifest file for the petclinic deployment"
 fi
-#
-# deploy the petclinic app as the splunk user
-#
-date_string="$(date)"
-echo -n "** $date_string - $WORKSHOP_NUM step - petclinic: deploy the petclinic app in kubernetes"
-echo "** $date_string - $WORKSHOP_NUM step - petclinic: deploy the petclinic app in kubernetes" >> ~/debug.txt
-#
-result="$(sudo -H -u splunker bash -c "eval \$(minikube -p minikube docker-env); kubectl apply -f ~/k8s_workshop/petclinic/k8s_deploy/$WS_USER-petclinic-k8s-manifest.yml" &> /tmp/k8s_output.txt)"; sleep 1
-cat /tmp/k8s_output.txt >> ~/debug.txt
-result="$(cat /tmp/k8s_output.txt | awk '{print $2}' | tr -d '\n')"; sleep 1
-if [ $result = "createdcreated" ] || [ $result = "createdunchanged" ] || [ $result = "unchangedcreated" ] || [ $result = "unchangedunchanged" ]; then
-echo " .... done"
-else
-echo " .... failed"
+
+# deploy the petclnic app as the splunk user
+log ${LINENO} "Deploying the petclinic app in the k8s cluster"
+sudo -H -u splunker bash -c "eval \$(minikube -p minikube docker-env); kubectl apply -f ~/k8s_workshop/petclinic/k8s_deploy/$WS_USER-petclinic-k8s-manifest.yml" &>/tmp/k8s_output.txt
+if [[ $? -ne 0 ]]; then
+  error_exit ${LINENO} "Failed to deploy the petclinic app in the k8s cluster"
 fi
-#
-# Environment ready foir FW2
-#
-date_string="$(date)"
-echo "** $date_string - Environment ready for foundational workshop #2"
+
+if [[ $? -ne 0 ]]; then
+  error_exit ${LINENO} "Failed to deploy the petclinic app in the k8s cluster" "red"
+fi
+
+log ${LINENO} "Environment ready for Foundational Workshop #2" "green"
