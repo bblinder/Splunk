@@ -4,11 +4,9 @@
 # The following script sets all components for a kubernetes | otel workshop and sets up
 # participants to start running Foundational Workshop #2
 #
-# author: Franco Ferrero-Poschetto
-# title: Staff Solutions Engineer, Splunk
+# author: Franco Ferrero-Poschetto, Staff Solutions Engineer, Splunk
 #
-# revisions: Brandon Blinderman
-# title: Senior Solutions Architect, Splunk
+# revisions: Brandon Blinderman, Senior Solutions Architect, Splunk
 #
 # version: 1.1.0
 # Changelog: implementing more robust setup with error handling, function usage, and checks for idempotency.
@@ -23,7 +21,14 @@ if [[ "$(uname -s)" != "Linux" ]]; then
   exit 1
 fi
 
-
+# Welcome message with Splunk logo
+echo "
+███████ ██████  ██      ██    ██ ███    ██ ██   ██     ██   
+██      ██   ██ ██      ██    ██ ████   ██ ██  ██       ██  
+███████ ██████  ██      ██    ██ ██ ██  ██ █████         ██ 
+     ██ ██      ██      ██    ██ ██  ██ ██ ██  ██       ██  
+███████ ██      ███████  ██████  ██   ████ ██   ██     ██   
+"
 # Prints log messages with timestamps and colors
 log() {
   local color=${3:-"white"}
