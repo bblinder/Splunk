@@ -21,6 +21,9 @@ Additionally, the application provides a Web interface (via Streamlit) where use
 | Energy  | TBD |
 | FSI Investment Banking  | [Docs](https://docs.google.com/document/d/1nLQFvKBgLAz7HweonBoHoFJcE88BdbHEgm4mov5ZdLQ/edit)  |
 | Private Banking | TBD  |
+| Manufacturing | TBD |
+| Insurance | TBD |
+| O11y4IT | [Use this URL for the Service Tree](https://o11y4it-demo-amer.splunk.show/en-US/app/itsi/homeview?viewType=service_topology&view=standard&earliest=-24h&latest=now&service=IT%20Infrastructure&service=Consumer%20Website&serviceId=bb36693d-c170-435e-b23d-9ed39db08eb0)
 
 
 ## Overview
