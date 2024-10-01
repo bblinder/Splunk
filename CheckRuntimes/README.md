@@ -32,10 +32,10 @@ CheckRuntimes/
    ```bash
    git clone https://github.com/bblinder/Splunk/CheckRuntimes.git
 
-Navigate into the project directory:
-```bash
-cd CheckRuntimes
-```
+2. Navigate into the project directory:
+    ```bash
+    cd CheckRuntimes
+    ```
 
 ## Usage
 
@@ -44,7 +44,7 @@ To run the script and get information about your system's versions and runtimes,
 python3 main.py
 ```
 
-If running the script(s) isn't an option (for security reasons, etc), the same information can be obtained by referencing the below.
+If running the script(s) isn't an option (for security reasons, etc), the same information can be obtained by referencing the below commands.
 
 
 ## Common Commands: Bash vs PowerShell
