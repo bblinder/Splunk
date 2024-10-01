@@ -81,6 +81,70 @@ Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\NET Framework Setup\NDP' -Recurse | Get-
 
 This command is already implemented in the `dotnet_framework.py` module for Windows systems.
 
+
+
+## OTel Collector config location(s) (Default)
+
+**Windows**
+```powershell
+C:\ProgramData\Splunk\OpenTelemetry Collector\agent_config.yaml
+```
+
+**Linux**
+```bash
+/etc/otel/collector/agent_config.yaml
+```
+
+The environment file with the required variables/values for the Splunk OpenTelemetry Collector service based on the specified parameters.
+
+```bash
+/etc/otel/collector/splunk-otel-collector.conf
+```
+
+
+## Tailing Collector Logs
+**Linux**
+
+Splunk Distro of OpenTelemetry:
+
+```bash
+sudo journalctl -u splunk-otel-collector -f -n 200
+```
+
+```bash
+tail -f /var/log/[splunk-otel-collector]
+```
+
+Upstream OTel Collector (contrib):
+```bash
+sudo journalctl -u otelcol-contrib -f -n 200
+```
+
+```bash
+tail -f /var/log/[otelcol-contrib]
+```
+
+## Getting Status/Restarting the OTel Collector
+
+**Linux**
+
+Splunk Distribution:
+```bash
+sudo systemctl [status/stop/start/restart] splunk-otel-collector
+```
+
+Upstream Contrib:
+```bash
+sudo systemctl [status/stop/start/restart] otelcol-contrib
+```
+
+**Windows**
+Stop the Collector service:
+
+```powershell
+[Stop-Service/Start-Service] splunk-otel-collector
+```
+
 **Logging**
 
 The scripts uses Python's built-in logging module to provide detailed logs at various levels (INFO, DEBUG, ERROR). You can configure the logging level in `logger_config.py`.

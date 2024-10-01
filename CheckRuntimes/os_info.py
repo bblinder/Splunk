@@ -2,7 +2,11 @@ import platform
 # import subprocess
 
 def get_os_info():
-   return platform.system(), platform.release()
+    system = platform.system()
+    release = platform.release()
+    architecture = platform.machine()
+
+    return system, release, architecture
 
 
 ## Leaving this for a future upgrade.

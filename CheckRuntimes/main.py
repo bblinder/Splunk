@@ -39,9 +39,10 @@ def otel_collector_version(os_name):
 def main():
     logger = configure_logging()
 
-    os_name, os_version = get_os_info()
+    os_name, os_version, os_architecture = get_os_info()
     logger.info(f"Operating System: {os_name}")
     logger.info(f"OS Version: {os_version}")
+    logger.info(f"OS Architecture: {os_architecture}")
 
     factory = RuntimeFactory()
 
