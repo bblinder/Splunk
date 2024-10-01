@@ -72,19 +72,21 @@ This command is already implemented in the `dotnet_framework.py` module for Wind
 
 **Usage**
 
-To run the script and get information about your system's runtimes, execute:
+To run the script and get information about your system's versions and runtimes, execute:
 ```bash
 python3 main.py
 ```
 
 **Logging**
 
-The script uses Python's built-in logging module to provide detailed logs at various levels (INFO, DEBUG, ERROR). You can configure the logging level in logger_config.py.
+The scripts uses Python's built-in logging module to provide detailed logs at various levels (INFO, DEBUG, ERROR). You can configure the logging level in `logger_config.py`.
 
 **Error Handling**
 
-The script includes robust error handling mechanisms using try-except blocks to catch potential exceptions during subprocess execution and registry access (on Windows).
+The scripts includes robust error handling mechanisms using try-except blocks to catch potential exceptions during subprocess execution and registry access (on Windows).
 
 **Contributing**
 
 If you wish to contribute to this project, please fork the repository and submit a pull request.
+
+**Use standard Python libraries** to maintain portability and minimize dependencies.
