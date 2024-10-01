@@ -67,6 +67,7 @@ For users who need to run commands manually or understand the underlying operati
 | Get current directory | `pwd` | `Get-Location` or `pwd` |
 | Move/Rename a file | `mv old_name new_name` | `Move-Item -Path old_name -Destination new_name` |
 | Copy a file | `cp source destination` | `Copy-Item -Path source -Destination destination` |
+| Get OTel Collector version | `/bin/otelcol -v` | TBD |
 
 Note: Some commands (like checking runtime versions) may be identical in both environments, while others differ significantly.
 
