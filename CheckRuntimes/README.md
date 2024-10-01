@@ -37,6 +37,16 @@ Navigate into the project directory:
 cd CheckRuntimes
 ```
 
+## Usage
+
+To run the script and get information about your system's versions and runtimes, execute:
+```bash
+python3 main.py
+```
+
+If running the script(s) isn't an option (for security reasons, etc), the same information can be obtained by referencing the below.
+
+
 ## Common Commands: Bash vs PowerShell
 
 For users who need to run commands manually or understand the underlying operations, here are some common commands used in this project with their Bash and PowerShell equivalents:
@@ -69,13 +79,6 @@ Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\NET Framework Setup\NDP' -Recurse | Get-
 ```
 
 This command is already implemented in the `dotnet_framework.py` module for Windows systems.
-
-**Usage**
-
-To run the script and get information about your system's versions and runtimes, execute:
-```bash
-python3 main.py
-```
 
 **Logging**
 
