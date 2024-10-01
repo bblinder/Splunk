@@ -139,6 +139,7 @@ sudo systemctl [status/stop/start/restart] otelcol-contrib
 ```
 
 **Windows**
+
 Stop the Collector service:
 
 ```powershell
