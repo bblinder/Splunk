@@ -2,6 +2,10 @@
 
 This project is designed to check and report information about the operating system and various runtime environments installed on a machine, such as Java, Python, Node.js, and .NET Framework (on Windows).
 
+## ⚠️ Warning: Work in Progress
+
+**PLEASE NOTE: This project is currently in early development stages and is considered a rough work in progress.**
+
 ## Project Structure
 
 ```plaintext
