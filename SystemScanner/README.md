@@ -1,10 +1,18 @@
-# Check Runtimes and System Versions
+# SystemScanner
 
 This project is designed to check and report information about the operating system and various runtime environments installed on a machine, such as Java, Python, Node.js, and .NET Framework (on Windows).
 
 ## ⚠️ Warning: Work in Progress
 
 **PLEASE NOTE: This project is currently in early development stages and is considered a rough work in progress.**
+
+## Features
+
+- Check operating system information
+- Check Java runtime version
+- Check Python runtime version
+- Check Node.js runtime version
+- Check .NET Framework versions (Windows only)
 
 ## Project Structure
 
@@ -28,7 +36,7 @@ CheckRuntimes/
 
 ## Requirements
 
-- Python 3.6 or higher
+- Python 3.9 or higher
 
 ## Installation
 

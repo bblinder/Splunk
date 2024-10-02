@@ -1,12 +1,13 @@
 import sys
 import subprocess
 
+
 class RuntimeFactory:
     def __init__(self):
         self.executors = {
-            'java': ['java', '-version'],
-            'node': ['node', '-v'],
-            'python': lambda: f'{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}'
+            "java": ["java", "-version"],
+            "node": ["node", "-v"],
+            "python": lambda: f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
         }
 
     def get_version(self, runtime_name):
@@ -15,7 +16,7 @@ class RuntimeFactory:
             return command()
         elif command:
             return self.execute_command(command)
-        return f'{runtime_name} not supported'
+        return f"{runtime_name} not supported"
 
     def execute_command(self, command):
         try:
@@ -24,6 +25,6 @@ class RuntimeFactory:
             )
             return result.stdout.decode().strip()
         except subprocess.CalledProcessError as e:
-            return f'Command failed: {e}'
+            return f"Command failed: {e}"
         except FileNotFoundError:
-            return f'{command[0]} not found'
+            return f"{command[0]} not found"

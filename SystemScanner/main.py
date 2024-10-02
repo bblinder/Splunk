@@ -11,19 +11,26 @@ from runtime_versions import RuntimeFactory
 from dotnet_framework import get_dotnet_versions
 from logger_config import configure_logging
 
+
 def otel_collector_version(os_name):
     try:
         if os_name == "Windows":
             # For Windows, we might need to adjust the path or command
-            result = subprocess.run(["where", "otelcol"], capture_output=True, text=True)
+            result = subprocess.run(
+                ["where", "otelcol"], capture_output=True, text=True
+            )
             if result.returncode == 0:
-                otelcol_path = result.stdout.strip().split('\n')[0]
-                version_result = subprocess.run([otelcol_path, "--version"], capture_output=True, text=True)
+                otelcol_path = result.stdout.strip().split("\n")[0]
+                version_result = subprocess.run(
+                    [otelcol_path, "--version"], capture_output=True, text=True
+                )
             else:
                 return "OpenTelemetry Collector not found"
         else:
             # For Linux and macOS
-            version_result = subprocess.run(["/bin/otelcol", "--version"], capture_output=True, text=True)
+            version_result = subprocess.run(
+                ["/bin/otelcol", "--version"], capture_output=True, text=True
+            )
 
         if version_result.returncode == 0:
             # The version info might be in stdout or stderr, depending on the collector's output
@@ -35,6 +42,7 @@ def otel_collector_version(os_name):
         return "OpenTelemetry Collector not found"
     except Exception as e:
         return f"Error checking OpenTelemetry Collector version: {str(e)}"
+
 
 def main():
     logger = configure_logging()
@@ -66,6 +74,7 @@ def main():
                 logger.info(f"{name}: {version}")
         else:
             logger.error(dotnet_versions)
+
 
 if __name__ == "__main__":
     main()
