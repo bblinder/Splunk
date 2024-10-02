@@ -17,7 +17,7 @@ This project is designed to check and report information about the operating sys
 ## Project Structure
 
 ```plaintext
-CheckRuntimes/
+SystemScanner/
 │
 ├── os_info.py
 ├── runtime_versions.py
@@ -42,11 +42,11 @@ CheckRuntimes/
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/bblinder/Splunk/CheckRuntimes.git
+   git clone https://github.com/bblinder/Splunk/SystemScanner.git
 
 2. Navigate into the project directory:
     ```bash
-    cd CheckRuntimes
+    cd SystemScanner
     ```
 
 ## Usage

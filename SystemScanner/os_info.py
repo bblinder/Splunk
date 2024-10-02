@@ -1,5 +1,16 @@
+"""
+SystemScanner: OS Information Module
+
+This module provides functionality to retrieve detailed information
+about the operating system on which the script is running.
+
+It includes functions to get the system name, release version,
+and architecture.
+"""
+
 import platform
 # import subprocess
+
 
 def get_os_info():
     system = platform.system()

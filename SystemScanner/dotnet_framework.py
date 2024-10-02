@@ -1,3 +1,18 @@
+"""
+SystemScanner: .NET Framework Detection Module
+
+This module is designed to detect and report installed versions
+of the .NET Framework on Windows systems.
+
+It uses the Windows Registry to gather this information and is
+only functional on Windows operating systems.
+
+Note: This module relies on the winreg library, which is only
+available on Windows systems. On other operating systems,
+the get_dotnet_versions function will return a message
+indicating that the winreg module is not available.
+"""
+
 try:
     import winreg as reg
 
@@ -31,5 +46,6 @@ try:
             return f"Error accessing registry: {e}"
 
 except ImportError:
+
     def get_dotnet_versions():
         return "winreg module not available on this platform"
