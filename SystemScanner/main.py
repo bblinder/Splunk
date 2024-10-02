@@ -9,43 +9,71 @@ Author: Brandon Blinderman
 from os_info import get_os_info
 from runtime_versions import RuntimeFactory
 from dotnet_framework import get_dotnet_versions
-from logger_config import configure_logging
+import logging
+
+
+def print_separator():
+    print("-" * 50)
 
 
 def main():
-    logger = configure_logging()
+    # Set up logging for debug purposes, but don't use it for main output
+    logging.basicConfig(
+        level=logging.DEBUG, filename="system_scanner.log", filemode="w"
+    )
+    logger = logging.getLogger(__name__)
 
+    print("=" * 50)
+    print("SYSTEM SCANNER REPORT")
+    print("=" * 50)
+    print()
+
+    # Operating System Information
     os_name, os_version, os_architecture = get_os_info()
-    logger.info(f"Operating System: {os_name}")
-    logger.info(f"OS Version: {os_version}")
-    logger.info(f"OS Architecture: {os_architecture}")
+    print("OPERATING SYSTEM INFORMATION:")
+    print(f"  System: {os_name}")
+    print(f"  Version: {os_version}")
+    print(f"  Architecture: {os_architecture}")
 
+    print_separator()
+
+    # Runtime Versions
     factory = RuntimeFactory()
+    print("RUNTIME VERSIONS:")
 
     java_version = factory.get_version("java")
-    logger.info(f"Java Version: {java_version}")
+    print(f"  Java: {java_version}")
 
     python_version = factory.get_version("python")
-    logger.info(f"Python Version: {python_version}")
+    print(f"  Python: {python_version}")
 
     node_version = factory.get_version("node")
-    logger.info(f"Node.js Version: {node_version}")
+    print(f"  Node.js: {node_version}")
 
+    print_separator()
+
+    # OpenTelemetry Collector Information
+    print("OPENTELEMETRY COLLECTOR INFORMATION:")
     otel_version, otel_path = factory.get_otel_collector_info()
-    logger.info(f"OpenTelemetry Collector Version: {otel_version}")
-    if otel_path:
-        logger.info(f"OpenTelemetry Collector Path: {otel_path}")
-    else:
-        logger.info("OpenTelemetry Collector Path: Not found")
+    print(f"  Version: {otel_version}")
+    print(f"  Path: {otel_path if otel_path else 'Not found'}")
 
+    print_separator()
+
+    # .NET Framework Versions (Windows only)
     if os_name == "Windows":
+        print(".NET FRAMEWORK VERSIONS:")
         dotnet_versions = get_dotnet_versions()
         if isinstance(dotnet_versions, list):
-            logger.info("Installed .NET Framework Versions:")
             for name, version in dotnet_versions:
-                logger.info(f"{name}: {version}")
+                print(f"  {name}: {version}")
         else:
-            logger.error(dotnet_versions)
+            print(f"  Error: {dotnet_versions}")
+
+    print()
+    print("=" * 50)
+    print("END OF SYSTEM SCANNER REPORT")
+    print("=" * 50)
 
 
 if __name__ == "__main__":

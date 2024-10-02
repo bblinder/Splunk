@@ -12,6 +12,7 @@ This project is designed to check and report information about the operating sys
 - Check Java runtime version
 - Check Python runtime version
 - Check Node.js runtime version
+- Check OpenTelemetry Collector version and path
 - Check .NET Framework versions (Windows only)
 
 ## Project Structure
@@ -22,7 +23,6 @@ SystemScanner/
 ├── os_info.py
 ├── runtime_versions.py
 ├── dotnet_framework.py
-├── logger_config.py
 └── main.py
 ```
 
@@ -31,7 +31,6 @@ SystemScanner/
 - **`os_info.py`**: Retrieves operating system information.
 - **`runtime_versions.py`**: Handles version checking and retrieval for various runtimes like Java, Python, and Node.js.
 - **`dotnet_framework.py`**: Specifically deals with retrieving .NET Framework versions on Windows systems.
-- **`logger_config.py`**: Configures logging, allowing for different logging levels.
 - **`main.py`**: Entry point to orchestrate the retrieval and logging of system information.
 
 ## Requirements
@@ -55,6 +54,40 @@ To run the script and get information about your system's versions and runtimes,
 ```bash
 python3 main.py
 ```
+
+### Output
+
+The script generates a formatted report directly to the console, structured as follows:
+
+```
+==================================================
+SYSTEM SCANNER REPORT
+==================================================
+
+OPERATING SYSTEM INFORMATION:
+  System: [OS Name]
+  Version: [OS Version]
+  Architecture: [OS Architecture]
+
+--------------------------------------------------
+RUNTIME VERSIONS:
+  Java: [Java Version]
+  Python: [Python Version]
+  Node.js: [Node.js Version]
+
+--------------------------------------------------
+OPENTELEMETRY COLLECTOR INFORMATION:
+  Version: [OTel Collector Version]
+  Path: [OTel Collector Path]
+
+--------------------------------------------------
+[.NET FRAMEWORK VERSIONS (if on Windows)]
+
+==================================================
+END OF SYSTEM SCANNER REPORT
+==================================================
+```
+
 
 If running the script(s) isn't an option (for security reasons, etc), the same information can be obtained by referencing the below commands.
 
@@ -158,16 +191,16 @@ Stop the Collector service:
 [Stop-Service/Start-Service] splunk-otel-collector
 ```
 
-**Logging**
+### Logging
 
-The scripts uses Python's built-in logging module to provide detailed logs at various levels (INFO, DEBUG, ERROR). You can configure the logging level in `logger_config.py`.
+While the main output is printed to the console, the script also generates a log file (`system_scanner.log`) in the same directory. This log file can be useful for debugging purposes.
 
-**Error Handling**
+## Error Handling
 
-The scripts includes robust error handling mechanisms using try-except blocks to catch potential exceptions during subprocess execution and registry access (on Windows).
+The script includes robust error handling mechanisms to catch potential exceptions during execution. Any errors or unexpected behaviors will be reflected in the output.
 
-**Contributing**
+## Contributing
 
 If you wish to contribute to this project, please fork the repository and submit a pull request.
 
-**Use standard Python libraries** to maintain portability and minimize dependencies.
+**Note**: This project uses standard Python libraries to maintain portability and minimize dependencies.
