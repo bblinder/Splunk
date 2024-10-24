@@ -18,19 +18,26 @@ This project is designed to check and report information about the operating sys
 ## Project Structure
 
 ```plaintext
-SystemScanner/
+system-scanner/
 │
 ├── os_info.py
 ├── runtime_versions.py
 ├── dotnet_framework.py
+├── health.py
+├── utils.py
+├── validators.py
 └── main.py
 ```
 
 ### Module Descriptions
 
+
 - **`os_info.py`**: Retrieves operating system information.
 - **`runtime_versions.py`**: Handles version checking and retrieval for various runtimes like Java, Python, and Node.js.
 - **`dotnet_framework.py`**: Specifically deals with retrieving .NET Framework versions on Windows systems.
+- **`health.py`**: Performs system health checks for disk space, network connectivity, and file permissions.
+- **`utils.py`**: Contains utility functions including contextual logging.
+- **`validators.py`**: Provides input validation and sanitization functions.
 - **`main.py`**: Entry point to orchestrate the retrieval and logging of system information.
 
 ## Requirements
@@ -41,19 +48,31 @@ SystemScanner/
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/bblinder/Splunk/SystemScanner.git
+   git clone https://github.com/splunk/observability-content-contrib.git
 
 2. Navigate into the project directory:
     ```bash
-    cd SystemScanner
+    cd observability-content-contrib/integration-examples/system-scanner
     ```
 
 ## Usage
 
 To run the script and get information about your system's versions and runtimes, execute:
 ```bash
-python3 main.py
+python3 main.py                    # Default text output
+python3 main.py --output json      # JSON output
+python3 main.py --health-check     # Include system health checks
 ```
+
+## Health Checks
+
+The system scanner includes basic health checks for:
+- Disk space
+- Network connectivity (tests connection to 8.8.8.8:53)
+- File system permissions (tests ability to create/delete temporary files)
+
+These checks can be enabled using the `--health-check` flag.
+
 
 ### Output
 
@@ -81,6 +100,12 @@ OPENTELEMETRY COLLECTOR INFORMATION:
   Path: [OTel Collector Path]
 
 --------------------------------------------------
+SYSTEM HEALTH:
+  disk_space: ✓
+  network: ✓
+  file_permissions: ✓
+
+--------------------------------------------------
 [.NET FRAMEWORK VERSIONS (if on Windows)]
 
 ==================================================
@@ -88,8 +113,12 @@ END OF SYSTEM SCANNER REPORT
 ==================================================
 ```
 
-
 If running the script(s) isn't an option (for security reasons, etc), the same information can be obtained by referencing the below commands.
+
+
+### Logging
+
+The script now generates logs in a `logs` directory, with detailed information about operations and any errors encountered during execution. The log file (`system_scanner.log`) can be found in the `logs` directory.
 
 
 ## Common Commands: Bash vs PowerShell

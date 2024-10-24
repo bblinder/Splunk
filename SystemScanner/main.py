@@ -2,79 +2,114 @@
 
 """
 SystemScanner
-Version 0.2
+Version 0.3
 Author: Brandon Blinderman
 """
 
+import argparse
+import json
+from typing import Optional, Dict, Any
 from os_info import get_os_info
 from runtime_versions import RuntimeFactory
 from dotnet_framework import get_dotnet_versions
-import logging
+from utils import ContextLogger
+from health import HealthCheck
+from validators import sanitize_command_output, validate_path
 
-
-def print_separator():
-    print("-" * 50)
-
-
-def main():
-    # Set up logging for debug purposes, but don't use it for main output
-    logging.basicConfig(
-        level=logging.DEBUG, filename="system_scanner.log", filemode="w"
+def parse_arguments() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description='System Scanner')
+    parser.add_argument(
+        '--output',
+        type=str,
+        choices=['json', 'text'],
+        default='text',
+        help='Output format (json or text)'
     )
-    logger = logging.getLogger(__name__)
+    parser.add_argument(
+        '--health-check',
+        action='store_true',
+        help='Perform system health check'
+    )
+    return parser.parse_args()
 
-    print("=" * 50)
-    print("SYSTEM SCANNER REPORT")
-    print("=" * 50)
-    print()
+def format_output(data: Dict[str, Any], output_format: str) -> str:
+    if output_format == 'json':
+        return json.dumps(data, indent=2)
+    return generate_text_report(data)
 
-    # Operating System Information
-    os_name, os_version, os_architecture = get_os_info()
-    print("OPERATING SYSTEM INFORMATION:")
-    print(f"  System: {os_name}")
-    print(f"  Version: {os_version}")
-    print(f"  Architecture: {os_architecture}")
+def generate_text_report(data: Dict[str, Any]) -> str:
+    report = []
+    report.append("=" * 50)
+    report.append("SYSTEM SCANNER REPORT")
+    report.append("=" * 50)
+    report.append("")
 
-    print_separator()
+    # OS Information
+    report.append("OPERATING SYSTEM INFORMATION:")
+    report.append(f"  System: {data['os_info']['system']}")
+    report.append(f"  Version: {data['os_info']['version']}")
+    report.append(f"  Architecture: {data['os_info']['architecture']}")
+
+    report.append("-" * 50)
 
     # Runtime Versions
-    factory = RuntimeFactory()
-    print("RUNTIME VERSIONS:")
+    report.append("RUNTIME VERSIONS:")
+    for runtime, version in data['runtime_versions'].items():
+        report.append(f"  {runtime}: {version}")
 
-    java_version = factory.get_version("java")
-    print(f"  Java: {java_version}")
+    report.append("-" * 50)
 
-    python_version = factory.get_version("python")
-    print(f"  Python: {python_version}")
+    # Health Check if available
+    if 'health_check' in data:
+        report.append("SYSTEM HEALTH:")
+        for check, status in data['health_check'].items():
+            status_str = "✓" if status else "✗"
+            report.append(f"  {check}: {status_str}")
+        report.append("-" * 50)
 
-    node_version = factory.get_version("node")
-    print(f"  Node.js: {node_version}")
+    return "\n".join(report)
 
-    print_separator()
+def main():
+    args = parse_arguments()
+    logger = ContextLogger(__name__)
 
-    # OpenTelemetry Collector Information
-    print("OPENTELEMETRY COLLECTOR INFORMATION:")
-    otel_version, otel_path = factory.get_otel_collector_info()
-    print(f"  Version: {otel_version}")
-    print(f"  Path: {otel_path if otel_path else 'Not found'}")
+    with logger.operation_context("System Scan"):
+        # Initialize health check
+        health_checker = HealthCheck()
 
-    print_separator()
+        # Collect system information
+        data = {}
 
-    # .NET Framework Versions (Windows only)
-    if os_name == "Windows":
-        print(".NET FRAMEWORK VERSIONS:")
-        dotnet_versions = get_dotnet_versions()
-        if isinstance(dotnet_versions, list):
-            for name, version in dotnet_versions:
-                print(f"  {name}: {version}")
-        else:
-            print(f"  Error: {dotnet_versions}")
+        # OS Information
+        os_name, os_version, os_architecture = get_os_info()
+        data['os_info'] = {
+            'system': sanitize_command_output(os_name),
+            'version': sanitize_command_output(os_version),
+            'architecture': sanitize_command_output(os_architecture)
+        }
 
-    print()
-    print("=" * 50)
-    print("END OF SYSTEM SCANNER REPORT")
-    print("=" * 50)
+        # Runtime Versions
+        factory = RuntimeFactory()
+        data['runtime_versions'] = {
+            'Java': sanitize_command_output(factory.get_version("java")),
+            'Python': sanitize_command_output(factory.get_version("python")),
+            'Node.js': sanitize_command_output(factory.get_version("node"))
+        }
 
+        # OpenTelemetry Collector Information
+        otel_version, otel_path = factory.get_otel_collector_info()
+        data['otel_collector'] = {
+            'version': sanitize_command_output(otel_version),
+            'path': validate_path(otel_path) if otel_path else None
+        }
+
+        # Health Check if requested
+        if args.health_check:
+            data['health_check'] = health_checker.check_system_resources()
+
+        # Output results
+        output = format_output(data, args.output)
+        print(output)
 
 if __name__ == "__main__":
     main()

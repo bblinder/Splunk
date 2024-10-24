@@ -41,33 +41,41 @@ class RuntimeFactory:
             return f"{command[0]} not found"
 
     def get_otel_collector_info(self):
-        try:
-            if os.name == "nt":  # Windows
-                result = subprocess.run(
-                    ["where", "otelcol"], capture_output=True, text=True
-                )
-                if result.returncode == 0:
-                    otelcol_path = result.stdout.strip().split("\n")[0]
-                    version_result = subprocess.run(
-                        [otelcol_path, "--version"], capture_output=True, text=True
-                    )
-                else:
-                    return "OpenTelemetry Collector not found", None
-            else:  # Unix-like systems
-                otelcol_path = "/bin/otelcol"
-                version_result = subprocess.run(
-                    [otelcol_path, "--version"], capture_output=True, text=True
-                )
+        otelcol_path = None
+        version_result = None
 
-            if version_result.returncode == 0:
-                version_info = version_result.stdout or version_result.stderr
-                return version_info.strip(), otelcol_path
-            else:
-                return (
-                    "Unable to determine OpenTelemetry Collector version",
-                    otelcol_path,
-                )
-        except FileNotFoundError:
+        if os.name == "nt":  # Windows
+            result = subprocess.run(
+                ["where", "otelcol"], capture_output=True, text=True
+            )
+            if result.returncode == 0:
+                otelcol_path = result.stdout.strip().split("\n")[0]
+                version_result = self.execute_command([otelcol_path, "--version"])
+        else:  # Unix-like systems
+            otelcol_path = "/usr/bin/otelcol"
+            if not os.path.exists(otelcol_path):
+                try:
+                    result = subprocess.run(
+                        ["which", "otelcol"], capture_output=True, text=True
+                    )
+                    if result.returncode == 0:
+                        otelcol_path = result.stdout.strip().split("\n")[0]
+                except Exception as e:
+                    return f"Error finding OpenTelemetry Collector: {str(e)}"
+
+            version_result = self.execute_command([otelcol_path, "--version"])
+
+        if not otelcol_path:
             return "OpenTelemetry Collector not found", None
-        except Exception as e:
-            return f"Error checking OpenTelemetry Collector version: {str(e)}", None
+
+        # Check if the result contains both the version and path
+        parts = version_result.split('\n')
+        for part in parts:
+            if 'OpenTelemetry Collector' in part:
+                version_info, path_info = part.strip().split(':')
+                return version_info.strip(), path_info.strip()
+
+        return (
+            f"Unable to determine OpenTelemetry Collector version",
+            None,
+        )
