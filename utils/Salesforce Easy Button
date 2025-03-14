@@ -1,0 +1,35 @@
+// Salesforce Easy Button.
+// Originally developed by Kenny Thompson
+//
+
+MutationObserver = window.MutationObserver || window.WebKitMutationObserver;
+var doHide = function() {
+    var tasks = ['--None--', 'Customer Pre-Sales Meeting', 'Post-Sales Customer Adoption'];
+    if (window.location.href.indexOf('Event/new') && $("div[data-target-selection-name='sfdc:RecordField.Event.Type']").length) {
+        $("div[data-target-selection-name='sfdc:RecordField.Event.Type'] .uiPopupTrigger").one("click", function () {
+            $("div[aria-labelledby='" + $(this).attr('id') + "'] li").each(function (i, v) {
+                if (!tasks.includes($(this).find('a').text())) {
+                    $(this).hide();
+                }
+            });
+        });
+    }
+
+    var subTasks = ['--None--', 'Discovery','Architecture Development', 'Office Hours', 'RFP/RFI', 'Demonstration / Presentation',
+    'Workshop', 'Proof Event (Poc)'];
+    if (window.location.href.indexOf('Event/new') && $("div[data-target-selection-name='sfdc:RecordField.Event.SEAL_Sub_Type__c']").length) {
+        $("div[data-target-selection-name='sfdc:RecordField.Event.SEAL_Sub_Type__c'] .uiPopupTrigger").one("click", function () {
+            $("div[aria-labelledby='" + $(this).attr('id') + "'] li").each(function (i, v) {
+                if (!subTasks.includes($(this).find('a').text())) {
+                    $(this).hide();
+                }
+            });
+        });
+    }
+}
+
+var observer = new MutationObserver(function(mutations, observer) {
+    doHide();
+});
+
+observer.observe(document, { childList: true, subtree: true });
