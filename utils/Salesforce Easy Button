@@ -15,7 +15,7 @@ var doHide = function() {
         });
     }
 
-    var subTasks = ['--None--', 'Discovery','Architecture Development', 'Office Hours', 'RFP/RFI', 'Demonstration / Presentation',
+    var subTasks = ['--None--', 'Adoption Support', 'Technical Discovery', 'Demonstration / Presentation',
     'Workshop', 'Proof Event (Poc)'];
     if (window.location.href.indexOf('Event/new') && $("div[data-target-selection-name='sfdc:RecordField.Event.SEAL_Sub_Type__c']").length) {
         $("div[data-target-selection-name='sfdc:RecordField.Event.SEAL_Sub_Type__c'] .uiPopupTrigger").one("click", function () {
