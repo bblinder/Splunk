@@ -1,6 +1,5 @@
 import logging
 import contextlib
-from typing import Optional
 from datetime import datetime
 import os
 

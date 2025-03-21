@@ -8,14 +8,13 @@ Author: Brandon Blinderman
 
 import argparse
 import json
-import re
-from typing import Optional, Dict, Any
+from typing import Dict, Any
 from os_info import get_os_info
 from runtime_versions import RuntimeFactory
-from dotnet_framework import get_dotnet_versions
 from utils import ContextLogger
 from health import HealthCheck
 from validators import sanitize_command_output, validate_path
+from datetime import datetime
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -40,20 +39,15 @@ def format_output(data: Dict[str, Any], output_format: str) -> str:
 
 
 def generate_text_report(data: Dict[str, Any]) -> str:
+    # Get current timestamp
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
     report = []
     report.append("=" * 50)
     report.append("SYSTEM SCANNER REPORT")
+    report.append(f"Generated: {current_time}")
     report.append("=" * 50)
     report.append("")
-
-    # OS Information
-    report.append("OPERATING SYSTEM INFORMATION:")
-    report.append(f"  System: {data['os_info']['system']}")
-    report.append(f"  Version: {data['os_info']['version']}")
-    report.append(f"  Architecture: {data['os_info']['architecture']}")
-    report.append(f"  Flavor: {data['os_info']['flavor']}")
-
-    report.append("-" * 50)
 
     # Runtime Versions
     report.append("RUNTIME VERSIONS:")
@@ -107,6 +101,9 @@ def main():
 
         # Collect system information
         data = {}
+
+        # Add timestamp
+        data["timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         # OS Information
         os_name, os_version, os_architecture, os_flavor = get_os_info()
