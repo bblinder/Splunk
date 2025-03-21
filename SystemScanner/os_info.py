@@ -9,6 +9,7 @@ and architecture.
 """
 
 import platform
+import sys
 
 
 def get_os_info():
@@ -22,13 +23,17 @@ def get_os_info():
         os_flavor = f"macOS {platform.mac_ver()[0]}"
     elif system == "Linux":
         try:
-            # Simple approach using platform.linux_distribution() if available
-            # Note: This is deprecated in Python 3.8+
-            if hasattr(platform, "linux_distribution"):
-                distro = platform.linux_distribution()[0]
-                os_flavor = f"Linux {distro}"
+            # Use platform.freedesktop_os_release() if available (Python 3.8+)
+            if sys.version_info >= (3, 8):
+                os_info = platform.freedesktop_os_release()
+                if os_info.get("PRETTY_NAME"):
+                    os_flavor = f"Linux {os_info['PRETTY_NAME']}"
+                elif os_info.get("NAME"):
+                    os_flavor = f"Linux {os_info['NAME']}"
+                else:
+                    os_flavor = "Linux"
             else:
-                # Fallback to reading /etc/os-release
+                # Fallback to reading /etc/os-release (for Python < 3.8)
                 with open("/etc/os-release") as f:
                     for line in f:
                         if line.startswith("PRETTY_NAME="):

@@ -15,6 +15,7 @@ from utils import ContextLogger
 from health import HealthCheck
 from validators import sanitize_command_output, validate_path
 from datetime import datetime
+from string import Template  # Using string.Template for text formatting
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -39,56 +40,83 @@ def format_output(data: Dict[str, Any], output_format: str) -> str:
 
 
 def generate_text_report(data: Dict[str, Any]) -> str:
-    # Get current timestamp
-    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    """
+    Generates a formatted text report from the collected data.
+    Uses string.Template for easier formatting.
+    """
 
-    report = []
-    report.append("=" * 50)
-    report.append("SYSTEM SCANNER REPORT")
-    report.append(f"Generated: {current_time}")
-    report.append("=" * 50)
-    report.append("")
+    template = """
+==================================================
+SYSTEM SCANNER REPORT
+Generated: ${timestamp}
+==================================================
 
-    # Runtime Versions
-    report.append("RUNTIME VERSIONS:")
-    for runtime, version in data["runtime_versions"].items():
-        report.append(f"  {runtime}: {version}")
+RUNTIME VERSIONS:
+--------------------------------------------------
+${runtime_versions}
+--------------------------------------------------
 
-    report.append("-" * 50)
+OPENTELEMETRY COLLECTOR INFORMATION:
+--------------------------------------------------
+Version: ${otel_version}
+Path: ${otel_path}
+--------------------------------------------------
+${kubernetes_info}
 
-    # OpenTelemetry Collector Information
-    report.append("OPENTELEMETRY COLLECTOR INFORMATION:")
-    report.append(f"  Version: {data['otel_collector']['version']}")
-    path_display = (
-        data["otel_collector"]["path"]
+${health_check}
+"""
+
+    # Runtime Versions formatting
+    runtime_versions_str = "\n".join(
+        f"  {runtime}: {version}"
+        for runtime, version in data["runtime_versions"].items()
+    )
+
+    # OTEL formatting
+    otel_version = f"{data['otel_collector']['version']}"
+    otel_path = (
+        f"{data['otel_collector']['path']}"
         if data["otel_collector"]["path"]
         else "Not found"
     )
-    report.append(f"  Path: {path_display}")
-    report.append("-" * 50)
 
-    # K8S Information
+    # Kubernetes formatting
+    kubernetes_info_str = ""
     if "kubernetes_info" in data:
-        report.append("KUBERNETES INFORMATION:")
+        kubernetes_info_str = "KUBERNETES INFORMATION:\n"
         if "otel_configmaps" in data["kubernetes_info"]:
             otel_maps = data["kubernetes_info"]["otel_configmaps"]
             if isinstance(otel_maps, list):
-                report.append(f"  OpenTelemetry ConfigMaps found: {len(otel_maps)}")
-                for cm in otel_maps:
-                    report.append(f"  - {cm['namespace']}/{cm['name']}")
+                kubernetes_info_str += (
+                    f"  OpenTelemetry ConfigMaps found: {len(otel_maps)}\n"
+                )
+                kubernetes_info_str += "\n".join(
+                    f"  - {cm['namespace']}/{cm['name']}" for cm in otel_maps
+                )
             else:
-                report.append(f"  OpenTelemetry ConfigMaps: {otel_maps}")
-        report.append("-" * 50)
+                kubernetes_info_str += f"  OpenTelemetry ConfigMaps: {otel_maps}\n"
+        kubernetes_info_str += "\n--------------------------------------------------"
 
-    # Health Check if available
+    # Health Check formatting
+    health_check_str = ""
     if "health_check" in data:
-        report.append("SYSTEM HEALTH:")
-        for check, status in data["health_check"].items():
-            status_str = "✓" if status else "✗"
-            report.append(f"  {check}: {status_str}")
-        report.append("-" * 50)
+        health_check_str = "SYSTEM HEALTH:\n"
+        health_check_str += "\n".join(
+            f"  {check}: {'✓' if status else '✗'}"
+            for check, status in data["health_check"].items()
+        )
+        health_check_str += "\n--------------------------------------------------"
 
-    return "\n".join(report)
+    report_data = {
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "runtime_versions": runtime_versions_str,
+        "otel_version": otel_version,
+        "otel_path": otel_path,
+        "kubernetes_info": kubernetes_info_str.strip(),
+        "health_check": health_check_str.strip(),
+    }
+
+    return Template(template).substitute(report_data)
 
 
 def main():
