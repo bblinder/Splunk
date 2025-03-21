@@ -8,6 +8,7 @@ Author: Brandon Blinderman
 
 import argparse
 import json
+import re
 from typing import Optional, Dict, Any
 from os_info import get_os_info
 from runtime_versions import RuntimeFactory
@@ -50,6 +51,7 @@ def generate_text_report(data: Dict[str, Any]) -> str:
     report.append(f"  System: {data['os_info']['system']}")
     report.append(f"  Version: {data['os_info']['version']}")
     report.append(f"  Architecture: {data['os_info']['architecture']}")
+    report.append(f"  Flavor: {data['os_info']['flavor']}")
 
     report.append("-" * 50)
 
@@ -95,11 +97,12 @@ def main():
         data = {}
 
         # OS Information
-        os_name, os_version, os_architecture = get_os_info()
+        os_name, os_version, os_architecture, os_flavor = get_os_info()
         data["os_info"] = {
             "system": sanitize_command_output(os_name),
             "version": sanitize_command_output(os_version),
             "architecture": sanitize_command_output(os_architecture),
+            "flavor": sanitize_command_output(os_flavor),
         }
 
         # Runtime Versions
