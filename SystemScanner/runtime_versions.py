@@ -9,6 +9,7 @@ It uses a factory pattern to manage different runtime version checks.
 """
 
 import os
+import json
 import sys
 import subprocess
 
@@ -18,7 +19,7 @@ class RuntimeFactory:
         self.executors = {
             "java": ["java", "-version"],
             "node": ["node", "-v"],
-            "python": lambda: f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+            "python": lambda: f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro} (Current Shell Environment)",
         }
 
     def get_version(self, runtime_name):
@@ -72,8 +73,16 @@ class RuntimeFactory:
                     timeout=5,
                 )
                 if version_result.returncode == 0:
-                    # Just return the first line of output as the version
-                    version = version_result.stdout.strip().split("\n")[0]
+                    # Extract just the version number
+                    version_output = version_result.stdout.strip().split("\n")[0]
+                    # Extract just the version part (vX.Y.Z)
+                    import re
+
+                    version_match = re.search(r"v\d+\.\d+\.\d+", version_output)
+                    if version_match:
+                        version = version_match.group(0)
+                    else:
+                        version = version_output
                     return version, otelcol_path
                 else:
                     return (
@@ -88,3 +97,51 @@ class RuntimeFactory:
 
         except Exception as e:
             return f"Error getting OpenTelemetry Collector info: {str(e)}", None
+
+    def is_running_in_kubernetes(self):
+        """Check if we're running inside a Kubernetes environment"""
+        return os.path.exists("/var/run/secrets/kubernetes.io/serviceaccount/token")
+
+    def get_otel_configmaps(self):
+        """Get OpenTelemetry collector ConfigMaps using only standard libraries"""
+        if not self.is_running_in_kubernetes():
+            return "Not running in a Kubernetes environment"
+
+        try:
+            # Use kubectl command through subprocess
+            result = subprocess.run(
+                ["kubectl", "get", "configmap", "--all-namespaces", "-o", "json"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+
+            configmaps = json.loads(result.stdout)
+            otel_configmaps = []
+
+            # Filter for OpenTelemetry related ConfigMaps
+            for item in configmaps.get("items", []):
+                name = item.get("metadata", {}).get("name", "")
+                namespace = item.get("metadata", {}).get("namespace", "")
+
+                # Look for common OpenTelemetry ConfigMap naming patterns
+                if any(
+                    pattern in name.lower()
+                    for pattern in ["otel", "opentelemetry", "collector"]
+                ):
+                    otel_configmaps.append(
+                        {
+                            "name": name,
+                            "namespace": namespace,
+                            "data": item.get("data", {}),
+                        }
+                    )
+
+            return otel_configmaps
+
+        except subprocess.CalledProcessError as e:
+            return f"Error executing kubectl: {e.stderr}"
+        except json.JSONDecodeError:
+            return "Error parsing kubectl output"
+        except Exception as e:
+            return f"Unexpected error: {str(e)}"

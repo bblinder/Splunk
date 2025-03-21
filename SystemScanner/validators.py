@@ -7,7 +7,7 @@ def sanitize_command_output(output: str) -> str:
     """Sanitize command output to prevent injection"""
     if not isinstance(output, str):
         return ""
-    return re.sub(r"[^\w\s.-]", "", output)
+    return re.sub(r"[^\w\s.()-]", "", output)  # Added () to the allowed characters
 
 
 def validate_path(path: str) -> Optional[str]:

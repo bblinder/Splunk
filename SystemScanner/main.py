@@ -71,8 +71,20 @@ def generate_text_report(data: Dict[str, Any]) -> str:
         else "Not found"
     )
     report.append(f"  Path: {path_display}")
-
     report.append("-" * 50)
+
+    # K8S Information
+    if "kubernetes_info" in data:
+        report.append("KUBERNETES INFORMATION:")
+        if "otel_configmaps" in data["kubernetes_info"]:
+            otel_maps = data["kubernetes_info"]["otel_configmaps"]
+            if isinstance(otel_maps, list):
+                report.append(f"  OpenTelemetry ConfigMaps found: {len(otel_maps)}")
+                for cm in otel_maps:
+                    report.append(f"  - {cm['namespace']}/{cm['name']}")
+            else:
+                report.append(f"  OpenTelemetry ConfigMaps: {otel_maps}")
+        report.append("-" * 50)
 
     # Health Check if available
     if "health_check" in data:
@@ -119,6 +131,10 @@ def main():
             "version": sanitize_command_output(otel_version),
             "path": validate_path(otel_path) if otel_path else None,
         }
+
+        # K8S Information
+        if factory.is_running_in_kubernetes():
+            data["kubernetes_info"] = {"otel_configmaps": factory.get_otel_configmaps()}
 
         # Health Check if requested
         if args.health_check:

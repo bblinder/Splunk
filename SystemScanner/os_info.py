@@ -10,6 +10,7 @@ and architecture.
 
 import platform
 
+
 def get_os_info():
     system = platform.system()
     release = platform.release()
@@ -23,7 +24,7 @@ def get_os_info():
         try:
             # Simple approach using platform.linux_distribution() if available
             # Note: This is deprecated in Python 3.8+
-            if hasattr(platform, 'linux_distribution'):
+            if hasattr(platform, "linux_distribution"):
                 distro = platform.linux_distribution()[0]
                 os_flavor = f"Linux {distro}"
             else:
