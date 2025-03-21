@@ -2,11 +2,13 @@ import re
 import os
 from typing import Optional
 
+
 def sanitize_command_output(output: str) -> str:
     """Sanitize command output to prevent injection"""
     if not isinstance(output, str):
         return ""
-    return re.sub(r'[^\w\s.-]', '', output)
+    return re.sub(r"[^\w\s.-]", "", output)
+
 
 def validate_path(path: str) -> Optional[str]:
     """Validate and normalize file path"""
@@ -18,10 +20,11 @@ def validate_path(path: str) -> Optional[str]:
     except Exception:
         return None
 
+
 def validate_version_string(version: str) -> str:
     """Validate and clean version string"""
     if not version or not isinstance(version, str):
         return "Unknown"
     # Remove any potentially harmful characters, keeping only valid version characters
-    cleaned = re.sub(r'[^\w\s.-]', '', version)
+    cleaned = re.sub(r"[^\w\s.-]", "", version)
     return cleaned if cleaned else "Unknown"

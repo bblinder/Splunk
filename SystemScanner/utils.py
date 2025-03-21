@@ -4,6 +4,7 @@ from typing import Optional
 from datetime import datetime
 import os
 
+
 class ContextLogger:
     def __init__(self, logger_name: str, log_file: str = "system_scanner.log"):
         self.logger = logging.getLogger(logger_name)
@@ -17,7 +18,7 @@ class ContextLogger:
 
         # Configure logging
         formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
         )
         file_handler = logging.FileHandler(log_path)
         file_handler.setFormatter(formatter)
@@ -40,4 +41,6 @@ class ContextLogger:
             raise
         finally:
             duration = datetime.now() - self.start_time
-            self.logger.info(f"{operation} completed in {duration.total_seconds():.2f}s")
+            self.logger.info(
+                f"{operation} completed in {duration.total_seconds():.2f}s"
+            )

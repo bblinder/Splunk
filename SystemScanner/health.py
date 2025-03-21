@@ -4,6 +4,7 @@ import shutil
 from typing import Dict
 import logging
 
+
 class HealthCheck:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
@@ -12,7 +13,7 @@ class HealthCheck:
         checks = {
             "disk_space": self._check_disk_space(),
             "network": self._check_network(),
-            "file_permissions": self._check_file_permissions()
+            "file_permissions": self._check_file_permissions(),
         }
         self._log_health_status(checks)
         return checks
