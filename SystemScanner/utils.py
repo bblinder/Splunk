@@ -36,7 +36,7 @@ class ContextLogger:
         try:
             yield
         except Exception as e:
-            self.logger.error(f"Error during {operation}: {e}")
+            self.logger.error(f"Error during {operation}: {e}", exc_info=True)
             raise
         finally:
             duration = datetime.now() - self.start_time
