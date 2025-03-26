@@ -11,6 +11,7 @@ and architecture.
 import platform
 import sys
 
+
 def get_os_info():
     system = platform.system()
     release = platform.release()
