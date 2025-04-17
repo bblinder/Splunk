@@ -1,6 +1,6 @@
 # Splunk Observability Token Expiration Monitor
 
-Python script to monitor Splunk Observability Cloud token expiration. Fetches tokens, calculates expiry, and sends `token.days_until_expiration` metrics.
+Python script to monitor Splunk Observability Cloud token expiration. Fetches tokens, calculates expiry, and sends `token.days_until_expiration` as a custom metrics for monitoring and alerting.
 
 ## Prerequisites
 
@@ -25,7 +25,7 @@ Configure via environment variables or CLI arguments. CLI arguments take precede
     * Env: `SPLUNK_EMAIL`, `SPLUNK_PASSWORD`, `SPLUNK_ORG_ID`
     * CLI: `--use-session`, `--email`, `--password`, `--org-id` (Use `$SPLUNK_PASSWORD` env var for safety)
     * **Note:** This method will not work if your organization uses SSO
-  
+
   * **Option 2: Pre-obtained Session Token** (works for all organizations, including SSO):
     * Manually obtain a session token from the Splunk Observability Cloud UI
     * Env: `SPLUNK_API_TOKEN` (despite the name, this should be a session token)
