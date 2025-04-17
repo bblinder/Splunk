@@ -10,11 +10,15 @@ Supports API token auth or Session token auth (with caching).
 Configuration via environment variables and command-line arguments.
 
 Author: Brandon Blinderman
-Version 4: 04/17/25
+Version: 04/17/25
 
 Example Usage:
     ./splunk_o11y_token_health.py --realm us0 --api-token YOUR_API_TOKEN --ingest-token YOUR_INGEST_TOKEN
     ./splunk_o11y_token_health.py --use-session --email a@abc.com --password pass --org-id 123 --realm us1 --ingest-token XXXXXXXX
+
+
+TODO:
+    Implement token rotation option for tokens =< 30 days from expiration.
 """
 
 import requests
