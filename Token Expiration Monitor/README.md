@@ -1,6 +1,6 @@
 # Splunk Observability Token Expiration Monitor
 
-Python script to monitor Splunk Observability Cloud token expiration. Fetches tokens, calculates expiry, and sends `token.days_until_expiration` as a custom metrics for monitoring and alerting.
+A tool to monitor Splunk Observability Cloud token expiration. Fetches tokens, calculates expiry, and sends `token.days_until_expiration` as a custom metric for monitoring and alerting.
 
 ## Prerequisites
 
@@ -24,7 +24,7 @@ Configure via environment variables or CLI arguments. CLI arguments take precede
     * Caches token for ~55 mins (`.session_token_cache.json`)
     * Env: `SPLUNK_EMAIL`, `SPLUNK_PASSWORD`, `SPLUNK_ORG_ID`
     * CLI: `--use-session`, `--email`, `--password`, `--org-id` (Use `$SPLUNK_PASSWORD` env var for safety)
-    * **Note:** This method will not work if your organization uses SSO
+    * **Note:** This method will not work if your organization uses SSO.
 
   * **Option 2: Pre-obtained Session Token** (works for all organizations, including SSO):
     * Manually obtain a session token from the Splunk Observability Cloud UI
@@ -68,11 +68,11 @@ export SPLUNK_PASSWORD='your_secret_password' # Use env var!
 export SPLUNK_ORG_ID="YOUR_ORG_ID"
 export SPLUNK_INGEST_TOKEN="YOUR_INGEST_TOKEN"
 
-# Execute the script with the session flag
+# Execute the script with the session flag.
 ./splunk_o11y_token_health.py --use-session
 ```
 
-> **Note:** If a valid cached session token exists, it will be used, and credentials won't be needed for that run.
+> **Note:** Cached tokens are reused automatically if valid.
 
 ### 3. Dry Run:
 
