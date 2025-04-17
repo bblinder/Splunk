@@ -14,7 +14,7 @@ Version 4: 04/17/25
 
 Example Usage:
     ./splunk_o11y_token_health.py --realm us0 --api-token YOUR_API_TOKEN --ingest-token YOUR_INGEST_TOKEN
-    ./ splunk_o11y_token_health.py --use-session --email a@abc.com --password pass --org-id 123 --realm us1 --ingest-token XXXXXXXX
+    ./splunk_o11y_token_health.py --use-session --email a@abc.com --password pass --org-id 123 --realm us1 --ingest-token XXXXXXXX
 """
 
 import requests
@@ -42,7 +42,7 @@ DEFAULT_PAGE_SIZE = 100
 SESSION_CACHE_FILE = '.session_token_cache.json'
 SESSION_CACHE_DURATION_SECONDS = 55 * 60  # Cache session token for 55 mins
 
-METRIC_DAYS_UNTIL_EXPIRATION = "token.days_until_expiration"
+TOKEN_EXPIRY_DAYS = "token.days_until_expiration"
 
 class ExpirationThreshold(enum.IntEnum):
     """Defines thresholds for token expiration warnings."""
@@ -319,7 +319,7 @@ def process_and_prepare_datapoints(raw_tokens: List[Dict[str, Any]]) -> Tuple[Li
         exp_dims["auth_scopes"] = ",".join(sorted(scopes)) if isinstance(scopes, list) and scopes else "None"
 
         datapoints.append(_create_datapoint(
-            METRIC_DAYS_UNTIL_EXPIRATION, days_until_expiration, exp_dims))
+            TOKEN_EXPIRY_DAYS, days_until_expiration, exp_dims))
 
     print(f"Processing complete. Prepared {len(datapoints)} datapoints for {summary_counts['processed']} relevant tokens.")
     return datapoints, summary_counts
