@@ -471,12 +471,17 @@ def main():
     if config['use_session']:
         auth_token = load_session_token_cache(SESSION_CACHE_FILE, SESSION_CACHE_DURATION_SECONDS)
         if auth_token is not None:  # Cache hit!
-            print(f"\nINFO: Using valid cached session token found in '{SESSION_CACHE_FILE}'.")
-            print(f"      Token: {auth_token}")
-            print("      Hint: You can skip --use-session and credentials by using this token directly:")
-            print(f"            export SPLUNK_API_TOKEN='{auth_token}'")
-            print("            # OR")
-            print(f"            --api-token '{auth_token}'\n")
+            # --- SUGGESTION #2: CONSOLIDATED MESSAGE ---
+            cache_message = (
+                f"\nINFO: Using valid cached session token found in '{SESSION_CACHE_FILE}'.\n"
+                f"      Token: {auth_token}\n"
+                "      Hint: You can skip --use-session and credentials by using this token directly:\n"
+                f"            export SPLUNK_API_TOKEN='{auth_token}'\n"
+                "            # OR\n"
+                f"            --api-token '{auth_token}'\n"
+            )
+            print(cache_message)
+            # --- END CONSOLIDATED MESSAGE ---
         else:  # Cache miss or expired
             print("No valid cached session token found.")
             # Avoid passing sensitive password directly if possible; rely on config dict access
