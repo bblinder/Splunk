@@ -96,3 +96,8 @@ When using `--use-session`, a successfully created session token is cached in `.
 
 * **0**: Success (metrics sent, or dry run completed, or no relevant tokens found)
 * **1**: Failure (configuration error, API error, metric sending failed)
+
+## References
+- https://dev.splunk.com/observability/reference/api/sessiontokens/latest
+- https://dev.splunk.com/observability/reference/api/org_tokens/latest#endpoint-retrieve-tokens-using-query
+- https://dev.splunk.com/observability/reference/api/ingest_data/latest#endpoint-send-metrics
