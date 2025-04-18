@@ -37,10 +37,19 @@ Configure via environment variables or CLI arguments. CLI arguments take precede
   * Env: `SPLUNK_INGEST_TOKEN`
   * CLI: `--ingest-token` (Not needed if using `--dry-run`)
 
-### Optional:
+**Optional:**
 
 * `--page-size`: Tokens per API request (Default: 100)
 * `--dry-run`: Process data and show planned metrics, but do not send them
+* `--include-all-tokens`: disables default expiry filtering (see below); includes all valid tokens.
+
+## Default Expiry filtering
+
+By default, the script only processes and sends metrics for tokens that meet these criteria:
+*   Expire within the next **100 days** (`<= 100`).
+*   Have expired within the last **30 days** (`>= -30`).
+
+Use the `--include-all-tokens` flag to bypass this filter and process all tokens with valid expiration dates
 
 ## Usage
 
@@ -80,6 +89,13 @@ export SPLUNK_INGEST_TOKEN="YOUR_INGEST_TOKEN"
 # Assumes required auth env vars are set
 ./splunk_o11y_token_health.py --dry-run
 ```
+
+### 4. Disable Default filtering
+
+```bash
+./splunk_o11y_token_health.py --include-all-tokens
+```
+
 
 ## Output Metric
 

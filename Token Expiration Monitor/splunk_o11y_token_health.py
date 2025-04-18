@@ -470,7 +470,7 @@ def print_summary(config: Dict[str, Any],
     if processed_count > 0 and total_expiring_or_warn == 0 :
         print(f"✅ No relevant tokens expiring within {ExpirationThreshold.WARNING} days or recently expired.")
     elif processed_count == 0 and raw_token_count is not None and raw_token_count > 0:
-        print(f"ℹ️  No relevant tokens remaining after filtering.")
+        print("ℹ️  No relevant tokens remaining after filtering.")
     elif processed_count == 0: # Handles case where raw_token_count is None or 0
          print("ℹ️  No relevant tokens with expiration dates were processed.")
 
