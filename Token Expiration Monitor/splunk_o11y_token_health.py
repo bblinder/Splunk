@@ -10,15 +10,11 @@ Supports API token auth or Session token auth (with caching).
 Configuration via environment variables and command-line arguments.
 
 Author: Brandon Blinderman
-Version: 04/17/25
+Version: 04/18/25
 
 Example Usage:
     ./splunk_o11y_token_health.py --realm us0 --api-token YOUR_API_TOKEN --ingest-token YOUR_INGEST_TOKEN
-    ./splunk_o11y_token_health.py --use-session --email a@abc.com --password pass --org-id 123 --realm us1 --ingest-token XXXXXXXX
-
-
-TODO:
-    Implement token rotation option for tokens =< 30 days from expiration.
+    ./splunk_o11y_token_health.py --use-session --email a@abc.com --password pass --org-id 123 --realm us1 --ingest-token XXXXXXXX...
 """
 
 import requests
@@ -29,7 +25,6 @@ import sys
 import argparse
 import time
 import enum
-# Added Tuple back for type hinting
 from typing import List, Dict, Optional, Any, Tuple
 
 # --- Config Constants ---
@@ -37,7 +32,6 @@ ENV_REALM = 'SPLUNK_REALM'
 ENV_EMAIL = 'SPLUNK_EMAIL'
 ENV_PASSWORD = 'SPLUNK_PASSWORD'
 ENV_ORG_ID = 'SPLUNK_ORG_ID'
-# usually a session token, obtained from the Splunk O11y UI or the API.
 ENV_API_TOKEN = 'SPLUNK_API_TOKEN'
 ENV_INGEST_TOKEN = 'SPLUNK_INGEST_TOKEN'
 
@@ -47,6 +41,10 @@ SESSION_CACHE_FILE = '.session_token_cache.json'
 SESSION_CACHE_DURATION_SECONDS = 55 * 60  # Cache session token for 55 mins
 
 TOKEN_EXPIRY_DAYS = "token.days_until_expiration"
+
+# Default filtering bounds
+DEFAULT_MAX_DAYS_AHEAD = 100
+DEFAULT_MAX_DAYS_AGO = -30
 
 class ExpirationThreshold(enum.IntEnum):
     """Defines thresholds for token expiration warnings."""
@@ -140,7 +138,7 @@ class SplunkObservabilityClient:
             next_cursor = data.get("nextPageToken") or data.get("cursor")
             if not next_cursor:
                 break
-
+        # Correction: Ellipsis removed, added missing indent for print statement
         print(f"Successfully retrieved {len(all_tokens)} tokens.")
         return all_tokens
 
@@ -212,6 +210,7 @@ class SplunkObservabilityClient:
             response_text = getattr(response, 'text', 'N/A')
             print(f"Response text hint: {response_text[:200]}")
             return None
+        # Correction: Removed ellipsis
 
 # --- Session Token Caching Functions ---
 def load_session_token_cache(cache_file: str, max_age_seconds: int) -> Optional[str]:
@@ -246,7 +245,7 @@ def load_session_token_cache(cache_file: str, max_age_seconds: int) -> Optional[
             print(f"Warning: Could not remove potentially corrupt cache file {cache_file}: {rm_err}")
         return None
 
-def save_session_token_cache(cache_file: str, token: str):
+def save_session_token_cache(cache_file: str, token: str) -> None: # Added return type hint
     """Saves session token to the cache file with a timestamp."""
     try:
         cache_content = {'token': token, 'timestamp': time.time()}
@@ -271,9 +270,14 @@ def _create_datapoint(metric_name: str, value: Any, dimensions: Dict[str, Any]) 
     safe_dimensions = {k: str(v)[:255] for k, v in dimensions.items()}
     return {"metric": metric_name, "value": value, "dimensions": safe_dimensions}
 
-def process_and_prepare_datapoints(raw_tokens: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], Dict[str, int]]:
+def process_and_prepare_datapoints(raw_tokens: List[Dict[str, Any]], include_all_tokens: bool) -> Tuple[List[Dict[str, Any]], Dict[str, int]]: # Added flag argument
     """
     Processes raw token data, generates datapoints, and calculates summary counts in a single pass.
+    By default, filters out tokens expiring > 100 days or expired > 30 days ago.
+
+    Args:
+        raw_tokens: List of token dictionaries from the API.
+        include_all_tokens: If True, bypasses the default expiry range filtering.
 
     Returns:
         A tuple containing:
@@ -281,7 +285,7 @@ def process_and_prepare_datapoints(raw_tokens: List[Dict[str, Any]]) -> Tuple[Li
         - Dictionary with summary counts ('processed', 'expired', 'critical', 'warning').
     """
     datapoints = []
-    summary_counts = {'processed': 0, 'expired': 0, 'critical': 0, 'warning': 0}
+    summary_counts = {'processed': 0, 'expired': 0, 'critical': 0, 'warning': 0, 'filtered_out': 0} # Added filtered_out count
     current_time = datetime.datetime.now(datetime.timezone.utc)
 
     print("Processing token data and preparing datapoints...")
@@ -298,14 +302,21 @@ def process_and_prepare_datapoints(raw_tokens: List[Dict[str, Any]]) -> Tuple[Li
         if not expiration_date:
             continue # Skip tokens without a valid expiration date
 
-        # Increment processed count for tokens that pass filters
-        summary_counts['processed'] += 1
-
         # Calculate days remaining
         days_until_expiration = (expiration_date - current_time).days
 
+        # Apply default filtering unless bypassed by the flag
+        if not include_all_tokens:
+            if days_until_expiration > DEFAULT_MAX_DAYS_AHEAD or days_until_expiration < DEFAULT_MAX_DAYS_AGO:
+                summary_counts['filtered_out'] += 1
+                continue # Skip this token
+
+        # Increment processed count ONLY for tokens that pass ALL filters
+        summary_counts['processed'] += 1
+
         # Check expiration status and update counts/print warnings
         if days_until_expiration < 0:
+            # Note: Expired tokens < -30 days are already filtered out above if default filtering is active
             print(f"  -> EXPIRED: Token '{token_name}' (ID: {token_id}) expired on {expiration_date.strftime('%Y-%m-%d')}.")
             summary_counts['expired'] += 1
         elif days_until_expiration <= ExpirationThreshold.CRITICAL:
@@ -314,6 +325,7 @@ def process_and_prepare_datapoints(raw_tokens: List[Dict[str, Any]]) -> Tuple[Li
         elif days_until_expiration <= ExpirationThreshold.WARNING:
             print(f"  -> WARNING: Token '{token_name}' (ID: {token_id}) expires in {days_until_expiration} days ({expiration_date.strftime('%Y-%m-%d')})")
             summary_counts['warning'] += 1
+        # Correction: Removed ellipsis
 
         # Prepare datapoint directly
         base_dims = {"token_name": token_name, "token_id": token_id, "token_type": token_type}
@@ -325,7 +337,8 @@ def process_and_prepare_datapoints(raw_tokens: List[Dict[str, Any]]) -> Tuple[Li
         datapoints.append(_create_datapoint(
             TOKEN_EXPIRY_DAYS, days_until_expiration, exp_dims))
 
-    print(f"Processing complete. Prepared {len(datapoints)} datapoints for {summary_counts['processed']} relevant tokens.")
+    filter_msg = f" {summary_counts['filtered_out']} tokens filtered out due to default expiry range." if not include_all_tokens and summary_counts['filtered_out'] > 0 else ""
+    print(f"Processing complete. Prepared {len(datapoints)} datapoints for {summary_counts['processed']} relevant tokens.{filter_msg}")
     return datapoints, summary_counts
 
 # --- Configuration Handling ---
@@ -342,7 +355,10 @@ Examples:
   ./splunk_o11y_token_health.py --use-session
 
   # Dry run:
-  ./splunk_o11y_token_health.py --dry-run"""
+  ./splunk_o11y_token_health.py --dry-run
+
+  # Include all tokens (disable default filtering >100 days ahead, < -30 days ago):
+  ./splunk_o11y_token_health.py --include-all-tokens"""
 
     parser = argparse.ArgumentParser(
         description='Monitor token expiration in Splunk Observability Cloud. Config priority: CLI > Env Vars > Defaults.',
@@ -366,6 +382,8 @@ Examples:
                         default=DEFAULT_PAGE_SIZE, help='Tokens to fetch per API request.')
     parser.add_argument('--dry-run', action='store_true',
                         default=False, help='Perform all steps except sending metrics.')
+    parser.add_argument('--include-all-tokens', action='store_true', default=False,
+                        help='Include all tokens regardless of expiry date, bypassing the default filter (>{DEFAULT_MAX_DAYS_AHEAD}d, <{DEFAULT_MAX_DAYS_AGO}d).')
     return parser.parse_args()
 
 def validate_config(config: Dict[str, Any], password_from_cli: bool) -> bool:
@@ -379,7 +397,7 @@ def validate_config(config: Dict[str, Any], password_from_cli: bool) -> bool:
     is_valid = True
     auth_method = "Session Token" if config['use_session'] else "API Token"
     print(f"Attempting configuration for {auth_method} authentication.")
-
+    # Correction: Removed ellipsis
     if config['use_session']:
         if not all([config['email'], config['password'], config['org_id']]):
             print(f"Error: --use-session requires email, password, and org ID. Set via CLI or env vars ({ENV_EMAIL}, {ENV_PASSWORD}, {ENV_ORG_ID}).")
@@ -409,19 +427,25 @@ def validate_config(config: Dict[str, Any], password_from_cli: bool) -> bool:
 # Updated Summary function to accept counts directly
 def print_summary(config: Dict[str, Any],
                   raw_token_count: Optional[int],
-                  summary_counts: Dict[str, int], # Changed from processed_data
+                  summary_counts: Dict[str, int],
                   datapoint_count: int,
-                  metrics_sent_status: bool):
+                  metrics_sent_status: bool) -> None: # Added return type hint
     """Execution summary."""
     print("\n=== Execution Summary ===")
     print(f"Realm: {config.get('realm', 'N/A')}")
     print(f"Authentication Method: {'Session Token' if config.get('use_session') else 'API Token'}")
     print(f"Dry Run Mode: {'Enabled' if config.get('dry_run') else 'Disabled'}")
     print(f"Tokens Retrieved from API: {raw_token_count if raw_token_count is not None else 'Failed'}")
+
     # Use counts directly from the summary_counts dict
     processed_count = summary_counts.get('processed', 0)
-    print(f"Relevant Tokens Processed (w/ Expiry): {processed_count}")
+    filtered_count = summary_counts.get('filtered_out', 0)
+    filter_status = "Disabled" if config.get('include_all_tokens') else "Enabled (default)"
+    print(f"Default Expiry Filtering (> {DEFAULT_MAX_DAYS_AHEAD}d, < {DEFAULT_MAX_DAYS_AGO}d): {filter_status}")
+    print(f"Tokens Filtered Out by Expiry Range: {filtered_count}")
+    print(f"Relevant Tokens Processed (post-filter): {processed_count}")
     print(f"Datapoints Prepared: {datapoint_count}")
+
 
     if config.get('dry_run'):
         print("Metrics Sent: No (Dry Run mode enabled)")
@@ -434,9 +458,9 @@ def print_summary(config: Dict[str, Any],
     warn_count = summary_counts.get('warning', 0)
     total_expiring_or_warn = expired_count + crit_count + warn_count # Simplified logic
 
-    print("\n--- Expiration Status ---")
+    print("\n--- Expiration Status (Post-Filtering) ---") # Clarified title
     if expired_count > 0:
-        print(f"🔴 {expired_count} token(s) ALREADY EXPIRED.")
+        print(f"🔴 {expired_count} token(s) ALREADY EXPIRED (within {abs(DEFAULT_MAX_DAYS_AGO)} days).") # Added range context
     if crit_count > 0:
         print(f"❗️ {crit_count} token(s) expiring within {ExpirationThreshold.CRITICAL} days (CRITICAL)")
     if warn_count > 0:
@@ -444,9 +468,11 @@ def print_summary(config: Dict[str, Any],
 
     # Use processed_count and total_expiring_or_warn for summary message
     if processed_count > 0 and total_expiring_or_warn == 0 :
-        print(f"✅ No relevant tokens expiring within {ExpirationThreshold.WARNING} days or already expired.")
-    elif processed_count == 0:
-        print("ℹ️  No relevant tokens with expiration dates were processed.")
+        print(f"✅ No relevant tokens expiring within {ExpirationThreshold.WARNING} days or recently expired.")
+    elif processed_count == 0 and raw_token_count is not None and raw_token_count > 0:
+        print(f"ℹ️  No relevant tokens remaining after filtering.")
+    elif processed_count == 0: # Handles case where raw_token_count is None or 0
+         print("ℹ️  No relevant tokens with expiration dates were processed.")
 
 
 # --- Main Execution ---
@@ -456,7 +482,7 @@ def main():
     print(f"Script started at {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
     args = parse_args()
-    config = vars(args)
+    config = vars(args) # Now includes 'include_all_tokens'
 
     password_env = os.environ.get(ENV_PASSWORD)
     password_arg = args.password
@@ -471,7 +497,6 @@ def main():
     if config['use_session']:
         auth_token = load_session_token_cache(SESSION_CACHE_FILE, SESSION_CACHE_DURATION_SECONDS)
         if auth_token is not None:  # Cache hit!
-            # --- SUGGESTION #2: CONSOLIDATED MESSAGE ---
             cache_message = (
                 f"\nINFO: Using valid cached session token found in '{SESSION_CACHE_FILE}'.\n"
                 f"      Token: {auth_token}\n"
@@ -481,11 +506,8 @@ def main():
                 f"            --api-token '{auth_token}'\n"
             )
             print(cache_message)
-            # --- END CONSOLIDATED MESSAGE ---
         else:  # Cache miss or expired
             print("No valid cached session token found.")
-            # Avoid passing sensitive password directly if possible; rely on config dict access
-            # which should contain the value from env or arg
             auth_token = SplunkObservabilityClient.create_session_token(
                 config['realm'], config['email'], config['password'], config['org_id']
             )
@@ -500,8 +522,7 @@ def main():
     # Initializing the client and kicking off the workflow
     raw_tokens = None
     datapoints = []
-    # Initialize summary counts dictionary
-    summary_counts = {'processed': 0, 'expired': 0, 'critical': 0, 'warning': 0}
+    summary_counts = {'processed': 0, 'expired': 0, 'critical': 0, 'warning': 0, 'filtered_out': 0} # Ensure filtered_out key exists
     metrics_sent_successfully = False
 
     try:
@@ -509,7 +530,8 @@ def main():
             raw_tokens = client.get_all_tokens(page_size=config['page_size'])
 
             if raw_tokens is not None:
-                datapoints, summary_counts = process_and_prepare_datapoints(raw_tokens)
+                # Pass the include_all_tokens flag from config
+                datapoints, summary_counts = process_and_prepare_datapoints(raw_tokens, config['include_all_tokens'])
 
                 # Send metrics or handle dry run
                 if config['dry_run']:
@@ -537,7 +559,7 @@ def main():
     print_summary(
         config=config,
         raw_token_count=len(raw_tokens) if raw_tokens is not None else None,
-        summary_counts=summary_counts, # Pass the counts dict
+        summary_counts=summary_counts,
         datapoint_count=len(datapoints),
         metrics_sent_status=metrics_sent_successfully,
     )
