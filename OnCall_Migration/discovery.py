@@ -57,7 +57,7 @@ API_ID = os.getenv("SOURCE_SPLUNK_ONCALL_API_ID")
 API_KEY = os.getenv("SOURCE_SPLUNK_ONCALL_API_KEY")
 ORG_SLUG = os.getenv("SOURCE_SPLUNK_ONCALL_ORG_SLUG")
 
-# Network session with native retry configuration for 429 and 50x errors
+# Network session with native retry for 429 and 50x errors
 SESSION = requests.Session()
 retries = Retry(
     total=6,
