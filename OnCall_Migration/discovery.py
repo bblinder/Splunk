@@ -392,7 +392,7 @@ if __name__ == "__main__":
 
     log.info("=" * 60)
     log.info(
-        "Discovery complete in %dm %02ds. Review inventory/ before proceeding to Phase 2.",
+        "Discovery complete in %dm %02ds. Review inventory/before proceeding to the next phase .",
         minutes,
         seconds,
     )
