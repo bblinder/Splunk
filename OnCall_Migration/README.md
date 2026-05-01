@@ -71,9 +71,9 @@ All extracted data is placed in the `inventory/` directory. Each file is a stand
 | `alert_rules_inventory.json` | All active alert rules. | Global | Rules defined in On-Call. |
 | `integrations_inventory.json` | Connected APIs/services. | Global | Integration configuration. |
 | `outbound_webhooks_inventory.json` | Webhook definitions. | Global | Webhook endpoints. |
-| **`schedules_inventory.json`** | On-Call schedules/rotations. | Per-Team | Schedules for every team. |
-| **`contact_methods_inventory.json`** | User contact details. | Per-User | Details like phone/email mappings. |
-| **`scheduled_overrides_inventory.json`** | Active, non-expired overrides. | Per-Team | Current override definitions. |
+| `schedules_inventory.json` | On-Call schedules/rotations. | Per-Team | Schedules for every team. |
+| `contact_methods_inventory.json` | User contact details. | Per-User | Details like phone/email mappings. |
+| `scheduled_overrides_inventory.json` | Active, non-expired overrides. | Per-Team | Current override definitions. |
 
 ***
 
