@@ -7,8 +7,9 @@ Think of this as the "data dump": everything you need to codify the current stat
 ---
 
 ## ⚠️ Warning: Work in Progress
----
+
 PLEASE NOTE: This project is currently in early development stages and is considered a rough work in progress.
+
 ---
 
 ## ⚙️ Getting Started
