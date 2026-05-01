@@ -1,4 +1,4 @@
-# 🚀 Splunk On-Call Configuration Discovery Tool
+# Splunk On-Call Configuration Discovery Tool
 
 This is a dedicated utility for extracting all discoverable configurations from a Splunk On-Call (VictorOps) environment into standardized JSON files. These serve as the data source for generating Infrastructure as Code (IaC), typically for tools like Terraform.
 
@@ -6,9 +6,9 @@ Think of this as the "data dump": everything you need to codify the current stat
 
 ---
 
-## ⚙️ Getting Started
+## Getting Started
 
-### 💾 Prerequisites
+### Prerequisites
 
 *   **Python:** 3.10+
 *   **Dependency:** `requests`
@@ -17,7 +17,7 @@ Think of this as the "data dump": everything you need to codify the current stat
 pip3 install requests
 ```
 
-### 🔒 Configuration
+### Configuration
 
 The script requires three environment variables:
 
@@ -34,7 +34,7 @@ export SOURCE_SPLUNK_ONCALL_API_KEY="your-api-key"
 export SOURCE_SPLUNK_ONCALL_ORG_SLUG="your-org-slug"
 ```
 
-### 🏃 Usage
+### Usage
 
 Run the script from your terminal:
 
@@ -44,18 +44,18 @@ python3 discovery.py
 
 ---
 
-## ✨ Key Features
+## Key Features
 
 *   **Comprehensive Coverage:** Fetches global resources (Users, Teams, Rules) and complex, scoped resources (User Paging Policies, Team Escalations, Schedules).
 *   **Robust API Handling:** Utilizes native `urllib3` adapters to gracefully handle **rate limiting (429)**, server errors (50x), exponential backoff, and automatic pagination detection.
 *   **Filtering:** Automatically detects and filters out expired on-call scheduled overrides, ensuring the output inventory only reflects current and future states.
 *   **Output Structure:** All data is placed in a dedicated `inventory/` directory, ready for use by IaC tools.
 
-## 📂 Inventory Structure
+## Inventory Structure
 
 All extracted data is placed in the `inventory/` directory. Each file is a standalone, structured JSON object, representing a distinct set of resources.
 
-### 📁 Directory Contents
+### Directory Contents
 
 | File Name | Data Contained | Scope | Description |
 | :--- | :--- | :--- | :--- |
@@ -73,7 +73,7 @@ All extracted data is placed in the `inventory/` directory. Each file is a stand
 
 ***
 
-### 💡 Developer Note
+### Developer Note
 
 The script includes helper functions (`api_get`, `fetch_per_entity`) to safely manage varied API responses (whether the data is in a bare list, wrapped in a dictionary, or requires looping through individual parent entities). 
 
