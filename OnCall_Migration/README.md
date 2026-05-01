@@ -6,12 +6,6 @@ Think of this as the "data dump": everything you need to codify the current stat
 
 ---
 
-## ⚠️ Warning: Work in Progress
-
-PLEASE NOTE: This project is currently in early development stages and is considered a rough work in progress.
-
----
-
 ## ⚙️ Getting Started
 
 ### 💾 Prerequisites
@@ -52,10 +46,10 @@ python3 discovery.py
 
 ## ✨ Key Features
 
-*   **Comprehensive Coverage:** Fetches global resources (Users, Teams, Rules) and complex, scoped resources (User Policies, Team Schedules).
-*   **Robust API Handling:** Handles **rate limiting (429)**, exponential backoff, retries, and automatic pagination detection.
-*   **Filtering:** Automatically detects and filters out expired on-call schedules, ensuring inventory is always current.
-*   **Output Structure:** All data is placed in a dedicated `inventory/` directory, for use by IaC tools.
+*   **Comprehensive Coverage:** Fetches global resources (Users, Teams, Rules) and complex, scoped resources (User Paging Policies, Team Escalations, Schedules).
+*   **Robust API Handling:** Utilizes native `urllib3` adapters to gracefully handle **rate limiting (429)**, server errors (50x), exponential backoff, and automatic pagination detection.
+*   **Filtering:** Automatically detects and filters out expired on-call scheduled overrides, ensuring the output inventory only reflects current and future states.
+*   **Output Structure:** All data is placed in a dedicated `inventory/` directory, ready for use by IaC tools.
 
 ## 📂 Inventory Structure
 
@@ -68,18 +62,19 @@ All extracted data is placed in the `inventory/` directory. Each file is a stand
 | `users_inventory.json` | List of all user accounts. | Global | Basic user records. |
 | `teams_inventory.json` | List of all teams. | Global | Team details and slugs. |
 | `routing_keys_inventory.json` | Global routing keys. | Global | Keys for routing alerts. |
-| `alert_rules_inventory.json` | All active alert rules. | Global | Rules defined in On-Call. |
+| `alert_rules_inventory.json` | All active alert rules. | Global | Ordered rules defined in On-Call. |
 | `integrations_inventory.json` | Connected APIs/services. | Global | Integration configuration. |
 | `outbound_webhooks_inventory.json` | Webhook definitions. | Global | Webhook endpoints. |
-| `schedules_inventory.json` | On-Call schedules/rotations. | Per-Team | Schedules for every team. |
 | `contact_methods_inventory.json` | User contact details. | Per-User | Details like phone/email mappings. |
-| `scheduled_overrides_inventory.json` | Active, non-expired overrides. | Per-Team | Current override definitions. |
+| `paging_policies_inventory.json` | User paging policies. | Per-User | Rules defining how/when users are paged. |
+| `escalation_policies_inventory.json` | Team escalation policies. | Per-Team | Step-by-step alert escalation rules. |
+| `schedules_inventory.json` | On-Call schedules/rotations. | Per-Team | Shift schedules for every team. |
+| `scheduled_overrides_inventory.json` | Active scheduled overrides. | Per-Team | Current and future override definitions. |
 
 ***
 
 ### 💡 Developer Note
 
-The script includes helper functions (`api_get`, `fetch_per_entity`) to safely manage varied API responses (whether the data is in a bare list, wrapped in a dictionary, or requires looping through individual parent entities).
+The script includes helper functions (`api_get`, `fetch_per_entity`) to safely manage varied API responses (whether the data is in a bare list, wrapped in a dictionary, or requires looping through individual parent entities). 
 
 It is a _read-only_ discovery tool. It does not modify any data in the Splunk On-Call environment.
-```

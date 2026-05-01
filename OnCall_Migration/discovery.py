@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 """
+Author: Brandon Blinderman
+Date: 05/01/2026
+
 Splunk On-Call Discovery Script.
 Exports all discoverable configurations from the SOURCE organization to versioned JSON files.
 
