@@ -31,7 +31,7 @@ The script requires three environment variables:
 ```bash
 export SOURCE_SPLUNK_ONCALL_API_ID="your-api-id"
 export SOURCE_SPLUNK_ONCALL_API_KEY="your-api-key"
-export SOURCE_SPLUNK_ONCALL_ORG_SLUG="your-org"
+export SOURCE_SPLUNK_ONCALL_ORG_SLUG="your-org-slug"
 ```
 
 ### 🏃 Usage
