@@ -25,7 +25,7 @@ The script requires three environment variables:
 | :--- | :--- | :--- |
 | `SOURCE_SPLUNK_ONCALL_API_ID` | Your API identifier. | `your-api-id` |
 | `SOURCE_SPLUNK_ONCALL_API_KEY` | Your secret API key. | `your-api-key` |
-| `SOURCE_SPLUNK_ONCALL_ORG_SLUG` | The On-Call organization slug. | `your-org` |
+| `SOURCE_SPLUNK_ONCALL_ORG_SLUG` | The On-Call organization slug. | `your-org-slug` |
 
 **Setup Example (Linux/macOS):**
 ```bash
