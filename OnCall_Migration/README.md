@@ -13,9 +13,16 @@ Think of this as the "data dump": everything you need to codify the current stat
 *   **Python:** 3.10+
 *   **Dependency:** `requests`
 
+### Installation
+
+You can manage dependencies using your preferred packaging method:
+
+**Using `pip` (standard method):**
 ```bash
 pip3 install requests
 ```
+
+**Using `uv`:** if using `uv`, you can run the script directly (see _Usage_ below)
 
 ### Configuration
 
@@ -42,6 +49,10 @@ Run the script from your terminal:
 python3 discovery.py
 ```
 
+**If using `uv`:**
+```bash
+uv run --with requests discovery.py 
+```
 ---
 
 ## Key Features
