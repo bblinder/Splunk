@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
 Author: Brandon Blinderman
-Date: 05/01/2026
+Date: 05/04/2026
 
-Splunk On-Call Discovery Script.
+Splunk On-Call (VictorOps)Discovery Script.
 Exports all discoverable configurations from the SOURCE organization to versioned JSON files.
 
 Usage:
@@ -75,9 +75,9 @@ SESSION.headers.update(
 )
 
 
-###
+############################
 # Helper: Paginated API GET
-###
+############################
 def api_get(
     endpoint: str, params: dict[str, Any] | None = None
 ) -> list[Any] | dict[str, Any] | None:
@@ -171,9 +171,9 @@ def api_get(
     return merged if is_list_response else data
 
 
-###
-# Helpers: Save, extract_list, fetch_per_entity
-###
+#################################################
+# Helpers: Save, extract_list, fetch_per_entity #
+#################################################
 def save(name: str, data: Any) -> None:
     path = OUTPUT_DIR / f"{name}.json"
     path.write_text(json.dumps(data, indent=2))
@@ -241,9 +241,9 @@ def fetch_per_entity(
     return results
 
 
-###
-# Extractions
-###
+###############
+# Extractions #
+###############
 def _parse_timestamp(ts: str) -> datetime:
     return datetime.fromisoformat(ts.replace("Z", "+00:00"))
 
@@ -295,9 +295,9 @@ def get_scheduled_overrides(teams: list[dict[str, Any]]) -> None:
     save("scheduled_overrides_inventory", overrides or {})
 
 
-###
-# Main
-###
+########
+# Main #
+########
 if __name__ == "__main__":
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     start_time = time.monotonic()
