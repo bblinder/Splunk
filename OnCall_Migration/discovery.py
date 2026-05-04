@@ -3,7 +3,7 @@
 Author: Brandon Blinderman
 Date: 05/04/2026
 
-Splunk On-Call (VictorOps)Discovery Script.
+Splunk On-Call (VictorOps) Discovery Script.
 Exports all discoverable configurations from the SOURCE organization to versioned JSON files.
 
 Usage:
