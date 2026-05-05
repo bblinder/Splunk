@@ -36,9 +36,9 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-###
-# Configuration
-###
+#################
+# Configuration #
+#################
 BASE_URL = "https://api.victorops.com/api-public/v1"
 OUTPUT_DIR = Path("inventory")
 
@@ -76,7 +76,7 @@ SESSION.headers.update(
 
 
 ############################
-# Helper: Paginated API GET
+# Helper: Paginated API GET#
 ############################
 def api_get(
     endpoint: str, params: dict[str, Any] | None = None
