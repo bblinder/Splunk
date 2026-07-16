@@ -1,91 +1,95 @@
-# Splunk On-Call Configuration Discovery Tool
+# Splunk On-Call Migration Tools
 
-This is a dedicated utility for extracting all discoverable configurations from a Splunk On-Call (VictorOps) environment into standardized JSON files. These serve as the data source for generating Infrastructure as Code (IaC), typically for tools like Terraform.
+Migrate Splunk On-Call (VictorOps) configuration from a source org to a target org using discovered JSON inventory and operator-controlled remapping.
 
-Think of this as the "data dump": everything you need to codify the current state of your system.
+## Pipeline
 
----
+| Step | Script | Output |
+|------|--------|--------|
+| 1. Discovery | `discovery.py` | `inventory/*.json`, `inventory_summary.md` |
+| 2. Inventory validation | `validate_inventory.py` | Exit 0/1 — consistency checks |
+| 3. Remapping | `generate_remapping.py` | `inventory/remapping.json` |
+| 4. Pre-flight | `validate_apply.py` | Exit 0/1 — remapping integrity |
+| 5. Apply | `apply.py` | `inventory/apply_report.json` |
 
-## Getting Started
+Manual capture (integrations, SSO, global admins) is documented in [`manual_capture/README.md`](manual_capture/README.md) and is not required for core API apply.
 
-### Prerequisites
+## Setup
 
-*   **Python:** 3.10+
-*   **Dependency:** `requests`
-
-### Installation
-
-You can manage dependencies using your preferred packaging method:
-
-**Using `pip` (standard method):**
 ```bash
-pip3 install requests
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+cp .env.example .env   # then edit .env with your credentials
 ```
 
-**Using `uv`:** if using `uv`, you can run the script directly (see _Usage_ below)
+Scripts load `.env` from the project root automatically (not cwd-dependent).
 
-### Configuration
-
-The script requires three environment variables:
-
-| Variable | Purpose | Example |
-| :--- | :--- | :--- |
-| `SOURCE_SPLUNK_ONCALL_API_ID` | Your API identifier. | `your-api-id` |
-| `SOURCE_SPLUNK_ONCALL_API_KEY` | Your secret API key. | `your-api-key` |
-| `SOURCE_SPLUNK_ONCALL_ORG_SLUG` | The On-Call organization slug. | `your-org-slug` |
-
-**Setup Example (Linux/macOS):**
+**Source (discovery)** — `discovery.py`:
 ```bash
-export SOURCE_SPLUNK_ONCALL_API_ID="your-api-id"
-export SOURCE_SPLUNK_ONCALL_API_KEY="your-api-key"
-export SOURCE_SPLUNK_ONCALL_ORG_SLUG="your-org-slug"
+SOURCE_SPLUNK_ONCALL_API_ID=...
+SOURCE_SPLUNK_ONCALL_API_KEY=...
+SOURCE_SPLUNK_ONCALL_ORG_SLUG=...
 ```
 
-### Usage
+**Target (apply)** — `apply.py`:
+```bash
+TARGET_SPLUNK_ONCALL_API_ID=...
+TARGET_SPLUNK_ONCALL_API_KEY=...
+TARGET_SPLUNK_ONCALL_ORG_SLUG=...
+```
 
-Run the script from your terminal:
+Shell `export` values take precedence over `.env` (same as `setdefault` semantics).
+
+## Usage
 
 ```bash
+# 1. Export source org (~30–40 min for large orgs)
 python3 discovery.py
+
+# 2. Validate inventory consistency
+python3 validate_inventory.py
+
+# 3. Generate remapping template (backs up edits if re-run!)
+python3 generate_remapping.py
+# Edit inventory/remapping.json — set null to skip a resource
+
+# 4. Validate remapping before touching target
+python3 validate_apply.py
+
+# 5. Dry-run apply (default — no writes)
+python3 apply.py
+
+# 6. Execute apply
+python3 apply.py --apply
 ```
 
-**If using `uv`:**
+If you have an older `manual_capture/remapping.json`, copy it once: `cp manual_capture/remapping.json inventory/remapping.json`
+
+## Remapping categories
+
+`inventory/remapping.json` maps source identifiers to target names/slugs (or `null` to skip):
+
+- `users`, `teams`, `routing_keys`, `escalation_policies`, `alert_rules`, `outbound_webhooks`
+
+Re-running `generate_remapping.py` **overwrites** the file — back up manual edits first.
+
+## Apply scope (core v1)
+
+**Included:** users, teams, members, rotations, escalation policies, routing keys, alert rules.
+
+**Deferred:** contact methods, paging policies, outbound webhooks, active overrides, integrations, SSO.
+
+**Manual after apply:** team admins (no public POST API).
+
+Escalation policies are **immutable via API after creation** — dry-run and validate carefully before `--apply`.
+
+## Tests
+
 ```bash
-uv run --with requests discovery.py 
+python3 -m unittest discover -s tests -t . -v
 ```
----
 
-## Key Features
+## Deep reference
 
-*   **Comprehensive Coverage:** Fetches global resources (Users, Teams, Rules) and complex, scoped resources (User Paging Policies, Team Escalations, Schedules).
-*   **Robust API Handling:** Utilizes native `urllib3` adapters to gracefully handle **rate limiting (429)**, server errors (50x), exponential backoff, and automatic pagination detection.
-*   **Filtering:** Automatically detects and filters out expired on-call scheduled overrides, ensuring the output inventory only reflects current and future states.
-*   **Output Structure:** All data is placed in a dedicated `inventory/` directory, ready for use by IaC tools.
+See [`docs/MIGRATION_GUIDE.md`](docs/MIGRATION_GUIDE.md) for inventory schema, API notes, and validation checklists.
 
-## Inventory Structure
-
-All extracted data is placed in the `inventory/` directory. Each file is a standalone, structured JSON object, representing a distinct set of resources.
-
-### Directory Contents
-
-| File Name | Data Contained | Scope | Description |
-| :--- | :--- | :--- | :--- |
-| `users_inventory.json` | List of all user accounts. | Global | Basic user records. |
-| `teams_inventory.json` | List of all teams. | Global | Team details and slugs. |
-| `routing_keys_inventory.json` | Global routing keys. | Global | Keys for routing alerts. |
-| `alert_rules_inventory.json` | All active alert rules. | Global | Ordered rules defined in On-Call. |
-| `integrations_inventory.json` | Connected APIs/services. | Global | Integration configuration. |
-| `outbound_webhooks_inventory.json` | Webhook definitions. | Global | Webhook endpoints. |
-| `contact_methods_inventory.json` | User contact details. | Per-User | Details like phone/email mappings. |
-| `paging_policies_inventory.json` | User paging policies. | Per-User | Rules defining how/when users are paged. |
-| `escalation_policies_inventory.json` | Team escalation policies. | Per-Team | Step-by-step alert escalation rules. |
-| `schedules_inventory.json` | On-Call schedules/rotations. | Per-Team | Shift schedules for every team. |
-| `scheduled_overrides_inventory.json` | Active scheduled overrides. | Per-Team | Current and future override definitions. |
-
-***
-
-### Developer Note
-
-The script includes helper functions (`api_get`, `fetch_per_entity`) to safely manage varied API responses (whether the data is in a bare list, wrapped in a dictionary, or requires looping through individual parent entities). 
-
-It is a _read-only_ discovery tool. It does not modify any data in the Splunk On-Call environment.
+[`docs/VALIDATION_REPORT.md`](docs/VALIDATION_REPORT.md) summarizes the live `sabre` discovery validation run.
