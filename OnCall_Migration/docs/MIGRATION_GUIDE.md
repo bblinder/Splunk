@@ -1,6 +1,6 @@
 # Splunk On-Call Migration Guide
 
-General reference for exporting Splunk On-Call (VictorOps) configuration from a source org before access ends. Use this document as a project spec or handoff prompt for continuing migration work.
+General reference for exporting Splunk On-Call (VictorOps) configuration from a source org. Use this document as a project spec for continuing migration work.
 
 ---
 
@@ -10,9 +10,9 @@ Build a **complete, durable configuration snapshot** of a Splunk On-Call org:
 
 1. **API discovery** — export all public-API-discoverable config to JSON
 2. **Manual capture** — document gaps the API cannot list (integrations, global permissions, SSO)
-3. **Apply** — provision target org from inventory + remapping (core v1 implemented)
+3. **Apply** — provision target org from inventory + remapping
 
-Terraform was evaluated and rejected for apply: the `splunk/victorops` provider doesn't cover all resources and is inconsistently maintained. Target-org provisioning is implemented in `apply.py` (core v1).
+Terraform was evaluated and rejected for the apply step: the `splunk/victorops` provider doesn't cover all resources and is inconsistently maintained. Target-org provisioning is implemented in `apply.py` instead.
 
 ---
  
@@ -27,7 +27,7 @@ Terraform was evaluated and rejected for apply: the `splunk/victorops` provider 
 | `apply.py` | Target-org provisioning (dry-run default; `--apply` to write) |
 | `env_loader.py` | Project-root `.env` loading (shared by `discovery.py` and `apply.py`) |
 | `tests/` | Mocked unit tests (no live API calls) |
-| `docs/` | Migration guide and validation report |
+| `docs/` | Migration guide and post-discovery validation template (`VALIDATION_REPORT.md`) |
 | `inventory/` | API export output and `remapping.json` (gitignored) |
 | `manual_capture/` | Manual capture templates and operator notes (gitignored) |
 | `README.md` | Usage, pipeline, quick reference |
@@ -36,7 +36,12 @@ Terraform was evaluated and rejected for apply: the `splunk/victorops` provider 
 
 **Setup:**
 ```bash
+# Option A: venv + pip
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+
+# Option B: uv
+uv venv && uv pip install -r requirements.txt
+
 cp .env.example .env   # then edit with your credentials
 ```
 
@@ -49,16 +54,19 @@ SOURCE_SPLUNK_ONCALL_API_KEY
 SOURCE_SPLUNK_ONCALL_ORG_SLUG
 ```
 
-**Run discovery:**
+**Run scripts:**
 ```bash
 python3 discovery.py
+# uv (project venv):  uv run python3 discovery.py
+# uv (ephemeral):     uv run --with requests python3 discovery.py
 ```
 
-Alternative without venv: `uv run --with requests python3 discovery.py`
+Replace `discovery.py` with any pipeline script (`validate_inventory.py`, `generate_remapping.py`, `validate_apply.py`, `apply.py`).
 
 **Run tests:** 
 ```bash
 python3 -m unittest discover -s tests -t . -v
+# uv: uv run python3 -m unittest discover -s tests -t . -v
 ```
 
 ---

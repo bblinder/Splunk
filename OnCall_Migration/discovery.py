@@ -10,6 +10,12 @@ Usage:
     cp .env.example .env   # set SOURCE_SPLUNK_ONCALL_API_ID, API_KEY, ORG_SLUG
     python3 discovery.py
 
+    # uv (with project .venv):
+    uv run python3 discovery.py
+
+    # uv (ephemeral, no venv):
+    uv run --with requests python3 discovery.py
+
     # Or via shell export (takes precedence over .env):
     export SOURCE_SPLUNK_ONCALL_API_ID="your-api-id"
     export SOURCE_SPLUNK_ONCALL_API_KEY="your-api-key"
@@ -31,7 +37,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -375,7 +381,7 @@ class DiscoveryPipeline:
             self.save_json("scheduled_overrides_inventory", overrides)
             self.inventory_counts["scheduled_overrides_inventory"] = len(overrides)
 
-            log.info(f"\n[Phase 4/4] Fetching escalation policy details...")
+            log.info("\n[Phase 4/4] Fetching escalation policy details...")
             unique_slugs = {
                 p.get("policy", {}).get("slug")
                 for p in policies_list

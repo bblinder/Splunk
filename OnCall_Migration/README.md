@@ -1,6 +1,6 @@
 # Splunk On-Call Migration Tools
 
-Migrate Splunk On-Call (VictorOps) configuration from a source org to a target org using discovered JSON inventory and operator-controlled remapping.
+Migrate Splunk On-Call (VictorOps) configuration from a source org to a target org using discovered inventory and remapping.
 
 ## Pipeline
 
@@ -12,16 +12,21 @@ Migrate Splunk On-Call (VictorOps) configuration from a source org to a target o
 | 4. Pre-flight | `validate_apply.py` | Exit 0/1 — remapping integrity |
 | 5. Apply | `apply.py` | `inventory/apply_report.json` |
 
-Manual capture (integrations, SSO, global admins) is documented in [`manual_capture/README.md`](manual_capture/README.md) and is not required for core API apply.
+Manual capture (integrations, SSO, global admins) is documented in [`manual_capture/README.md`](manual_capture/README.md) and is not required for core usage.
 
 ## Setup
 
 ```bash
+# Option A: venv + pip
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-cp .env.example .env   # then edit .env with your credentials
+
+# Option B: uv
+uv venv && uv pip install -r requirements.txt
+
+cp .env.example .env   # then edit with your credentials
 ```
 
-Scripts load `.env` from the project root automatically (not cwd-dependent).
+Scripts load `.env` from the project root automatically (not dependent on the current working directory).
 
 **Source (discovery)** — `discovery.py`:
 ```bash
@@ -37,7 +42,7 @@ TARGET_SPLUNK_ONCALL_API_KEY=...
 TARGET_SPLUNK_ONCALL_ORG_SLUG=...
 ```
 
-Shell `export` values take precedence over `.env` (same as `setdefault` semantics).
+**NOTE:** Shell `export` values take precedence over `.env`.
 
 ## Usage
 
@@ -62,17 +67,20 @@ python3 apply.py
 python3 apply.py --apply
 ```
 
+With uv project venv: prefix commands with `uv run` (e.g. `uv run python3 discovery.py`).  
+**NOTE:** Without a venv: `uv run --with requests python3 discovery.py` works for any script.
+
 If you have an older `manual_capture/remapping.json`, copy it once: `cp manual_capture/remapping.json inventory/remapping.json`
 
 ## Remapping categories
 
-`inventory/remapping.json` maps source identifiers to target names/slugs (or `null` to skip):
+`inventory/remapping.json` maps source identifiers to target names/slugs (or use`null` to skip specific resources):
 
 - `users`, `teams`, `routing_keys`, `escalation_policies`, `alert_rules`, `outbound_webhooks`
 
-Re-running `generate_remapping.py` **overwrites** the file — back up manual edits first.
+Re-running `generate_remapping.py` **overwrites** the file. _Back up manual edits first._
 
-## Apply scope (core v1)
+## Apply scope (core usage)
 
 **Included:** users, teams, members, rotations, escalation policies, routing keys, alert rules.
 
@@ -80,16 +88,17 @@ Re-running `generate_remapping.py` **overwrites** the file — back up manual ed
 
 **Manual after apply:** team admins (no public POST API).
 
-Escalation policies are **immutable via API after creation** — dry-run and validate carefully before `--apply`.
+Escalation policies are **immutable via API after creation**: dry-run and validate carefully before `--apply`.
 
 ## Tests
 
 ```bash
 python3 -m unittest discover -s tests -t . -v
+# uv: uv run python3 -m unittest discover -s tests -t . -v
 ```
 
 ## Deep reference
 
 See [`docs/MIGRATION_GUIDE.md`](docs/MIGRATION_GUIDE.md) for inventory schema, API notes, and validation checklists.
 
-[`docs/VALIDATION_REPORT.md`](docs/VALIDATION_REPORT.md) summarizes the live `sabre` discovery validation run.
+[`docs/VALIDATION_REPORT.md`](docs/VALIDATION_REPORT.md) is a template for recording post-discovery validation results.
