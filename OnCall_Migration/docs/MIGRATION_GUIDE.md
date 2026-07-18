@@ -1,6 +1,6 @@
 # Splunk On-Call Migration Guide
 
-General reference for exporting Splunk On-Call (VictorOps) configuration from a source org. Use this document as a project spec for continuing migration work.
+Deep reference for exporting and migrating Splunk On-Call (VictorOps) configuration. For installation, credentials, and step-by-step commands, start with [`README.md`](../README.md). After discovery, optionally record results using [`VALIDATION_REPORT.md`](VALIDATION_REPORT.md).
 
 ---
 
@@ -15,10 +15,41 @@ Build a **complete, durable configuration snapshot** of a Splunk On-Call org:
 Terraform was evaluated and rejected for the apply step: the `splunk/victorops` provider doesn't cover all resources and is inconsistently maintained. Target-org provisioning is implemented in `apply.py` instead.
 
 ---
- 
+
+## Quick reference
+
+### Migration workflow
+
+| Step | Action | Command | Output / note |
+| :--- | :--- | :--- | :--- |
+| 1 | Discovery | `python3 discovery.py` | `inventory/*.json`, `inventory_summary.md` (~30–40 min for large orgs) |
+| 2 | Validation | `python3 validate_inventory.py` | Exit 0/1 — consistency checks |
+| 3 | Remapping | `python3 generate_remapping.py` | `inventory/remapping.json` — edit manually; set `null` to skip |
+| 4 | Pre-flight | `python3 validate_apply.py` | Exit 0/1 — remapping integrity |
+| 5 | Dry run | `python3 apply.py` | No writes to target org |
+| 6 | Apply | `python3 apply.py --apply` | `inventory/apply_report.json` |
+
+**uv:** With a project `.venv`, prefix commands with `uv run` (e.g. `uv run python3 discovery.py`). Without a venv, use `uv run --with requests python3 <script>.py` for any pipeline script.
+
+### Safety and important notes
+
+- **Dry runs:** Always run `python3 apply.py` without `--apply` first.
+- **Immutable resources:** Escalation policies are **immutable via API after creation**. Validate remapping carefully before `--apply`.
+- **Overwrites:** Re-running `generate_remapping.py` overwrites `inventory/remapping.json`. Back up manual edits first.
+
+### Scope
+
+**Included in automated apply:** `users`, `teams`, `members`, `rotations`, `escalation_policies`, `routing_keys`, `alert_rules`
+
+**Deferred:** `contact_methods`, `paging_policies`, `outbound_webhooks`, `active_overrides`, `integrations`, `SSO`
+
+**Manual after apply:** Team admins (no public POST API)
+
+---
+
 ## Repository layout
 
-| Path | Purpose | 
+| Path | Purpose |
 | :--- | :--- |
 | `discovery.py` | Read-only exporter. Four-phase pipeline, serial API throttle |
 | `validate_inventory.py` | Post-discovery consistency checks (no API) |
@@ -30,31 +61,14 @@ Terraform was evaluated and rejected for the apply step: the `splunk/victorops` 
 | `docs/` | Migration guide and post-discovery validation template (`VALIDATION_REPORT.md`) |
 | `inventory/` | API export output and `remapping.json` (gitignored) |
 | `manual_capture/` | Manual capture templates and operator notes (gitignored) |
-| `README.md` | Usage, pipeline, quick reference |
+| `README.md` | Quick start, workflow, scope |
 | `.env` | Source/target API credentials (gitignored) |
 | `.env.example` | Credential template |
 
-**Setup:**
-```bash
-# Option A: venv + pip
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-
-# Option B: uv
-uv venv && uv pip install -r requirements.txt
-
-cp .env.example .env   # then edit with your credentials
-```
-
-Scripts load `.env` from the project root automatically (not cwd-dependent). Shell `export` values take precedence over `.env`.
-
-**Source (discovery)** — set in `.env` or environment:
-```
-SOURCE_SPLUNK_ONCALL_API_ID
-SOURCE_SPLUNK_ONCALL_API_KEY
-SOURCE_SPLUNK_ONCALL_ORG_SLUG
-```
+**Installation and configuration:** Same as [README Quick Start](../README.md#quick-start). Scripts load `.env` from the project root automatically (not cwd-dependent). Shell `export` values take precedence over `.env`.
 
 **Run scripts:**
+
 ```bash
 python3 discovery.py
 # uv (project venv):  uv run python3 discovery.py
@@ -63,7 +77,8 @@ python3 discovery.py
 
 Replace `discovery.py` with any pipeline script (`validate_inventory.py`, `generate_remapping.py`, `validate_apply.py`, `apply.py`).
 
-**Run tests:** 
+**Run tests:**
+
 ```bash
 python3 -m unittest discover -s tests -t . -v
 # uv: uv run python3 -m unittest discover -s tests -t . -v
@@ -127,7 +142,7 @@ Incidents, alerts, point-in-time on-call snapshots, expired overrides, reporting
 
 ## Phase 2: Manual capture
 
-Three gaps have no public API. Capture from the Splunk On-Call portal and your identity provider.
+Three gaps have no public API. Capture from the Splunk On-Call portal and your identity provider. See [`manual_capture/README.md`](../manual_capture/README.md) for the step-by-step checklist.
 
 | Gap | Location | Source |
 | :--- | :--- | :--- |
@@ -135,7 +150,6 @@ Three gaps have no public API. Capture from the Splunk On-Call portal and your i
 | User permissions | `manual_capture/user_permissions/` | Settings → Organization → Users |
 | SSO settings | `manual_capture/sso/` | IdP admin console |
 
-**Workflow:** `manual_capture/README.md`  
 **Status tracker:** `manual_capture/capture_status.json`
 
 ### Integrations to verify
@@ -160,7 +174,7 @@ SSO backend config is coordinated with Splunk support; document IdP-side setting
 
 ---
 
-## Phase 3: Apply (core v1)
+## Phase 3: Apply
 
 `apply.py` provisions a target org from `inventory/` using `inventory/remapping.json`.
 
@@ -202,10 +216,6 @@ flowchart LR
 | Routing keys | `POST /org/routing-keys` | Target policy slugs from apply step |
 | Alert rules | `POST /alertRules` | Preserve `rank`; remap routing-key matches |
 
-### Deferred in core v1
-
-Contact methods, paging policies, outbound webhooks, active overrides, integrations, SSO.
-
 ### Remapping
 
 `generate_remapping.py` produces six categories: `users`, `teams`, `routing_keys`, `escalation_policies`, `alert_rules`, `outbound_webhooks`. Output defaults to `inventory/remapping.json`. Set any value to `null` to skip that resource. Re-running the generator overwrites the file.
@@ -229,6 +239,7 @@ After discovery run:
 - [ ] `discovery_metadata.json` counts and `files_written` match on-disk files
 - [ ] Zero HTTP 404s on required endpoints in `discovery_run.log`
 - [ ] Unit tests pass
+- [ ] Optional: fill in [`VALIDATION_REPORT.md`](VALIDATION_REPORT.md) template
 
 Before apply:
 
@@ -245,7 +256,10 @@ After manual capture:
 
 ---
 
-## References
+## Related documentation
 
+- [`README.md`](../README.md) — quick start, installation, workflow
+- [`VALIDATION_REPORT.md`](VALIDATION_REPORT.md) — post-discovery validation template
+- [`manual_capture/README.md`](../manual_capture/README.md) — integrations, permissions, SSO capture
 - [VictorOps public API docs](https://portal.victorops.com/public/api-docs.html)
 - [Splunk On-Call SSO documentation](https://help.splunk.com/en/splunk-enterprise/alert-and-respond/splunk-on-call/introduction-to-splunk-on-call/single-sign-on)
