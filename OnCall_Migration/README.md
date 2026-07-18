@@ -1,20 +1,11 @@
 # Splunk On-Call Migration Tools
 
-Migrate Splunk On-Call (VictorOps) configuration from a source org to a target org using discovered inventory and remapping.
+This toolset facilitates the migration of Splunk On-Call (VictorOps) configurations from a source organization to a target organization using an automated inventory discovery and remapping workflow.
 
-## Pipeline
+## Quick Start
 
-| Step | Script | Output |
-|------|--------|--------|
-| 1. Discovery | `discovery.py` | `inventory/*.json`, `inventory_summary.md` |
-| 2. Inventory validation | `validate_inventory.py` | Exit 0/1 — consistency checks |
-| 3. Remapping | `generate_remapping.py` | `inventory/remapping.json` |
-| 4. Pre-flight | `validate_apply.py` | Exit 0/1 — remapping integrity |
-| 5. Apply | `apply.py` | `inventory/apply_report.json` |
-
-Manual capture (integrations, SSO, global admins) is documented in [`manual_capture/README.md`](manual_capture/README.md) and is not required for core usage.
-
-## Setup
+### Installation
+You can install dependencies using either standard `venv` or `uv`:
 
 ```bash
 # Option A: venv + pip
@@ -22,83 +13,70 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 
 # Option B: uv
 uv venv && uv pip install -r requirements.txt
-
-cp .env.example .env   # then edit with your credentials
 ```
 
-Scripts load `.env` from the project root automatically (not dependent on the current working directory).
+### Configuration
+Create a `.env` file in the project root (copy from `.env.example`) and provide the following credentials. Note that shell `export` values will override these settings.
 
-**Source (discovery)** — `discovery.py`:
+**Source Credentials (`discovery.py`):**
 ```bash
 SOURCE_SPLUNK_ONCALL_API_ID=...
 SOURCE_SPLUNK_ONCALL_API_KEY=...
 SOURCE_SPLUNK_ONCALL_ORG_SLUG=...
 ```
 
-**Target (apply)** — `apply.py`:
+**Target Credentials (`apply.py`):**
 ```bash
 TARGET_SPLUNK_ONCALL_API_ID=...
 TARGET_SPLUNK_ONCALL_API_KEY=...
 TARGET_SPLUNK_ONCALL_ORG_SLUG=...
 ```
 
-**NOTE:** Shell `export` values take precedence over `.env`.
+## Migration Workflow
 
-## Usage
+Follow these steps in order to migrate your configuration:
 
-```bash
-# 1. Export source org (~30–40 min for large orgs)
-python3 discovery.py
+1. **Discovery**: Extract the source organization state.
+   `python3 discovery.py` (Expected duration: ~30–40 min for large orgs)
+2. **Validation**: Verify consistency of the discovered inventory.
+   `python3 validate_inventory.py`
+3. **Remapping**: Generate a template for mapping source IDs to target names/slugs.
+   `python3 generate_remapping.py`
+   *Note: Edit `inventory/remapping.json` manually if needed. Set values to `null` to skip resources.*
+4. **Pre-flight**: Validate the remapping logic before executing against the target.
+   `python3 validate_apply.py`
+5. **Dry Run**: Perform a simulated application of changes (no writes).
+   `python3 apply.py`
+6. **Apply**: Execute the migration to the target organization.
+   `python3 apply.py --apply`
 
-# 2. Validate inventory consistency
-python3 validate_inventory.py
+> [!TIP]
+> If using `uv`, prefix commands with `uv run`. If not using a virtual environment, use:
+> `uv run --with requests python3 discovery.py`
 
-# 3. Generate remapping template (backs up edits if re-run!)
-python3 generate_remapping.py
-# Edit inventory/remapping.json — set null to skip a resource
+## Safety & Important Notes
 
-# 4. Validate remapping before touching target
-python3 validate_apply.py
+- **Dry Runs**: Always run `python3 apply.py` without the `--apply` flag first to verify your changes.
+- **Immutable Resources**: Escalation policies are **immutable via API after creation**. Validate your remapping carefully before running with `--apply`.
+- **Overwrites**: Running `generate_remapping.py` will overwrite `inventory/remapping.json`. Back up any manual edits before re-running.
 
-# 5. Dry-run apply (default — no writes)
-python3 apply.py
+## Scope & Reference
 
-# 6. Execute apply
-python3 apply.py --apply
-```
+### Included Resources
+The migration covers the following core resources:
+- `users`, `teams`, `members`, `rotations`, `escalation_policies`, `routing_keys`, `alert_rules`
 
-With uv project venv: prefix commands with `uv run` (e.g. `uv run python3 discovery.py`).  
-**NOTE:** Without a venv: `uv run --with requests python3 discovery.py` works for any script.
+### Deferred / Manual Tasks
+The following are excluded from the automated run and may require manual handling or separate scripts:
+- **Deferred:** `contact_methods`, `paging_policies`, `outbound_webhooks`, `active_overrides`, `integrations`, `SSO`.
+- **Manual:** Team admins (no public POST API).
 
-If you have an older `manual_capture/remapping.json`, copy it once: `cp manual_capture/remapping.json inventory/remapping.json`
-
-## Remapping categories
-
-`inventory/remapping.json` maps source identifiers to target names/slugs (or use`null` to skip specific resources):
-
-- `users`, `teams`, `routing_keys`, `escalation_policies`, `alert_rules`, `outbound_webhooks`
-
-Re-running `generate_remapping.py` **overwrites** the file. _Back up manual edits first._
-
-## Apply scope (core usage)
-
-**Included:** users, teams, members, rotations, escalation policies, routing keys, alert rules.
-
-**Deferred:** contact methods, paging policies, outbound webhooks, active overrides, integrations, SSO.
-
-**Manual after apply:** team admins (no public POST API).
-
-Escalation policies are **immutable via API after creation**: dry-run and validate carefully before `--apply`.
+### Documentation
+- **Migration Guide**: [`docs/MIGRATION_GUIDE.md`](docs/MIGRATION_GUIDE.md) (Schema, API notes, checklists)
+- **Validation Template**: [`docs/VALIDATION_REPORT.md`](docs/VALIDATION_REPORT.md) (Template for recording results)
 
 ## Tests
-
 ```bash
 python3 -m unittest discover -s tests -t . -v
 # uv: uv run python3 -m unittest discover -s tests -t . -v
 ```
-
-## Deep reference
-
-See [`docs/MIGRATION_GUIDE.md`](docs/MIGRATION_GUIDE.md) for inventory schema, API notes, and validation checklists.
-
-[`docs/VALIDATION_REPORT.md`](docs/VALIDATION_REPORT.md) is a template for recording post-discovery validation results.

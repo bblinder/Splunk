@@ -245,40 +245,6 @@ After manual capture:
 
 ---
 
-## Handoff prompt (copy to another LLM)
-
-```
-You are continuing a Splunk On-Call (VictorOps) configuration migration project.
-
-Goal: Complete master reference of source org config before access ends.
-Scope now: API discovery (done) + manual capture (pending) + apply (core v1 implemented).
-
-Repo contains:
-- discovery.py, validate_inventory.py, generate_remapping.py, validate_apply.py, apply.py, env_loader.py
-- manual_capture/ — templates for integrations, permissions, SSO (operator fill-in)
-- tests/ — mocked unit tests
-- docs/ — MIGRATION_GUIDE.md, VALIDATION_REPORT.md
-- .env.example — credential template
-
-Read docs/MIGRATION_GUIDE.md and README.md first. inventory/ and manual_capture/ are gitignored.
-
-Constraints:
-- Read-only discovery; no writes to Splunk On-Call
-- Never commit secrets
-- schedules_inventory = calendar projection; rotation_definitions_inventory = durable config
-- Integrations have no public list API
-
-First task: Review the existing code and project structure against Python and API-client best practices. Report:
-1. Structural or design issues
-2. Opportunities to simplify (remove duplication, reduce complexity, clearer abstractions)
-3. Opportunities to improve (error handling, test coverage, performance, maintainability)
-4. What to leave alone — do not suggest changes for their own sake
-
-Prioritize high-impact, low-risk recommendations. Then ask which phase to continue: manual capture completion, apply hardening (deferred resources), or implementation of approved improvements.
-```
-
----
-
 ## References
 
 - [VictorOps public API docs](https://portal.victorops.com/public/api-docs.html)
