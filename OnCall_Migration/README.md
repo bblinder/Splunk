@@ -16,7 +16,7 @@ uv venv && uv pip install -r requirements.txt
 ```
 
 ### Configuration
-Create a `.env` file in the project root (copy from `.env.example`) and provide the following credentials. Note that shell `export` values will override these settings.
+Create a `.env` file in the project root (copy from `.env.example`) and provide the following credentials. Scripts load `.env` from the project root automatically; shell `export` values override file settings.
 
 **Source Credentials (`discovery.py`):**
 ```bash
@@ -42,7 +42,7 @@ Follow these steps in order to migrate your configuration:
    `python3 validate_inventory.py`
 3. **Remapping**: Generate a template for mapping source IDs to target names/slugs.
    `python3 generate_remapping.py`
-   *Note: Edit `inventory/remapping.json` manually if needed. Set values to `null` to skip resources.*
+   *Note: Edit `inventory/remapping.json` manually if needed. Set values to `null` to skip resources. Alert rules that match routing-key patterns may reference values not in `routing_keys_inventory`; add those keys to `remapping.json` manually or set the rule ID to `null` to skip.*
 4. **Pre-flight**: Validate the remapping logic before executing against the target.
    `python3 validate_apply.py`
 5. **Dry Run**: Perform a simulated application of changes (no writes).
@@ -50,9 +50,7 @@ Follow these steps in order to migrate your configuration:
 6. **Apply**: Execute the migration to the target organization.
    `python3 apply.py --apply`
 
-> [!TIP]
-> If using `uv`, prefix commands with `uv run`. If not using a virtual environment, use:
-> `uv run --with requests python3 discovery.py`
+**uv:** Prefix commands with `uv run`. Without a venv: `uv run --with requests python3 <script>.py`.
 
 ## Safety & Important Notes
 

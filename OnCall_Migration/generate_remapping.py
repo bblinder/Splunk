@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+"""Build inventory/remapping.json from discovery inventory files."""
+
 import json
 import logging
 from pathlib import Path

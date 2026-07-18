@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+"""Pre-flight checks for remapping.json against inventory (no API calls)."""
+
 import json
 import logging
 import re
@@ -36,7 +39,7 @@ class PreFlightValidator:
         return key not in mappings or mappings.get(key) is None
 
     def validate(self) -> int:
-        log.info("Starting Pre-Flight Validation...")
+        log.info("Starting pre-flight validation...")
         remapping = self._load_json(self.remapping_file)
         if not remapping:
             log.error(f"Remapping file not found at {self.remapping_file}")
@@ -51,11 +54,11 @@ class PreFlightValidator:
         self._validate_alert_rules(remapping)
 
         log.info("-" * 40)
-        log.info(f"Validation Complete: {self.errors} Errors, {self.warnings} Warnings/Skips.")
+        log.info(f"Validation complete: {self.errors} errors, {self.warnings} warnings/skips.")
         if self.errors > 0:
-            log.error("Validation FAILED. Please correct the errors in remapping.json before running apply.py.")
+            log.error("Validation failed. Correct errors in remapping.json before running apply.py.")
             return self.errors
-        log.info("Validation PASSED. Ready for Apply phase.")
+        log.info("Validation passed. Ready for apply phase.")
         return 0
 
     def _validate_formats(self, remapping: Dict[str, Any]) -> None:

@@ -129,6 +129,14 @@ Some teams may have no escalation policies — that is expected when teams exist
 
 ---
 
+## Before apply
+
+After remapping is ready, run `python3 validate_apply.py` before any apply dry run. It checks remapping format and relational integrity against inventory.
+
+Alert rules with `alertField: routing_key` may match pattern values not exported in `routing_keys_inventory.json`. If validation reports a missing routing key for a rule, add the match value under `routing_keys` in `remapping.json` or set the rule ID to `null` in `alert_rules` to skip it.
+
+---
+
 ## Conclusion
 
 > Discovery against org `{ORG_SLUG}` on `{DATE}`: **{PASS / FAIL}**.

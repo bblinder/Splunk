@@ -146,8 +146,8 @@ Three gaps have no public API. Capture from the Splunk On-Call portal and your i
 
 | Gap | Location | Source |
 | :--- | :--- | :--- |
-| Integrations | `manual_capture/integrations/` | Portal → Integrations |
-| User permissions | `manual_capture/user_permissions/` | Settings → Organization → Users |
+| Integrations | `manual_capture/integrations/` | Portal, Integrations |
+| User permissions | `manual_capture/user_permissions/` | Settings, Organization, Users |
 | SSO settings | `manual_capture/sso/` | IdP admin console |
 
 **Status tracker:** `manual_capture/capture_status.json`
@@ -220,6 +220,8 @@ flowchart LR
 
 `generate_remapping.py` produces six categories: `users`, `teams`, `routing_keys`, `escalation_policies`, `alert_rules`, `outbound_webhooks`. Output defaults to `inventory/remapping.json`. Set any value to `null` to skip that resource. Re-running the generator overwrites the file.
 
+**Alert rule routing keys:** The generator populates `routing_keys` only from `routing_keys_inventory.json`. Rules with `alertField: routing_key` may use pattern match values (for example rotation names) that are not listed as org routing keys. `validate_apply.py` fails if a non-skipped rule references a match value missing from `remapping.routing_keys`. Add the match value under `routing_keys` with the desired target name, or set the rule ID to `null` in `alert_rules` to skip it.
+
 Validate before apply:
 
 ```bash
@@ -244,6 +246,7 @@ After discovery run:
 Before apply:
 
 - [ ] `python3 generate_remapping.py` run (or `inventory/remapping.json` manually maintained)
+- [ ] Alert-rule routing key match values are present in `remapping.json` or the rule ID is set to `null`
 - [ ] `python3 validate_apply.py` passes
 - [ ] `python3 apply.py` dry-run reviewed
 

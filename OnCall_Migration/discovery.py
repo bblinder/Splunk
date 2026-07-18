@@ -1,10 +1,6 @@
 #!/usr/bin/env python3
 """
-Author: Brandon Blinderman
-Date: 07/16/2026
-
-Splunk On-Call (VictorOps) Discovery Script.
-Exports all discoverable configurations from the SOURCE organization to versioned JSON files.
+Export discoverable Splunk On-Call (VictorOps) configuration from the source org to JSON.
 
 Usage:
     cp .env.example .env   # set SOURCE_SPLUNK_ONCALL_API_ID, API_KEY, ORG_SLUG
@@ -16,15 +12,9 @@ Usage:
     # uv (ephemeral, no venv):
     uv run --with requests python3 discovery.py
 
-    # Or via shell export (takes precedence over .env):
-    export SOURCE_SPLUNK_ONCALL_API_ID="your-api-id"
-    export SOURCE_SPLUNK_ONCALL_API_KEY="your-api-key"
-    export SOURCE_SPLUNK_ONCALL_ORG_SLUG="your-org-slug"
-    python3 discovery.py
-
 Output: inventory/*.json, inventory_summary.md, discovery_metadata.json
 
-Next steps: validate_inventory.py → generate_remapping.py → validate_apply.py → apply.py
+Next steps: validate_inventory.py, generate_remapping.py, validate_apply.py, apply.py
 """
 
 import itertools

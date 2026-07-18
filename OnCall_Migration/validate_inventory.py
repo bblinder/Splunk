@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+"""Validate on-disk inventory consistency after discovery (no API calls)."""
+
 import json
 import logging
 import sys

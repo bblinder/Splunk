@@ -411,7 +411,7 @@ class ApplyPipeline:
     def _transform_policy_entry(self, entry: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         execution_type = entry.get("executionType")
         if execution_type == "webhook":
-            log.warning("  Skipping webhook escalation entry (webhooks deferred in core v1).")
+            log.warning("  Skipping webhook escalation entry (outbound webhooks are deferred).")
             self._bump("escalation_policies", "warned")
             return None
         transformed: Dict[str, Any] = {"executionType": execution_type}
