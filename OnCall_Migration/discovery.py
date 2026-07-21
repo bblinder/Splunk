@@ -23,35 +23,24 @@ import logging
 import os
 import sys
 import time
-import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from env_loader import PROJECT_ROOT, load_dotenv
+from exceptions import ApiError, NetworkError
+from summary_reporter import SummaryReporter
+from migration_types import InventoryCounts
+from utils import RateLimiter
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S")
 log = logging.getLogger(__name__)
 
-class RateLimiter:
-    """Thread-safe rate limiter to strictly adhere to VictorOps 2 req/sec limits."""
-    def __init__(self, rate_hz: float):
-        self.delay = 1.0 / rate_hz
-        self.last_call = 0.0
-        self.lock = threading.Lock()
-
-    def wait(self):
-        with self.lock:
-            now = time.monotonic()
-            elapsed = now - self.last_call
-            if elapsed < self.delay:
-                time.sleep(self.delay - elapsed)
-            self.last_call = time.monotonic()
 
 class VictorOpsClient:
     """Encapsulates API session, base URLs, rate limiting, and generic fetching."""
@@ -89,13 +78,13 @@ class VictorOpsClient:
                 resp = self.session.get(url, params=current_params, timeout=30)
             except requests.RequestException as exc:
                 log.error(f"Network Error: {url} - {exc}")
-                raise RuntimeError(f"Failed to fetch {url}: {exc}") from exc
+                raise NetworkError(f"Failed to fetch {url}: {exc}") from exc
 
             if resp.status_code == 404:
                 msg = f"Endpoint not found (404): {url}"
                 if required:
                     log.critical(msg)
-                    raise RuntimeError(msg)
+                    raise ApiError(msg)
                 log.warning(f"Not Found (404) for {url}, skipping.")
                 return None
 
@@ -146,10 +135,16 @@ class VictorOpsClient:
 
 class DiscoveryPipeline:
     """Orchestrates the data extraction logic using VictorOpsClient."""
-    def __init__(self, client: VictorOpsClient, output_dir: Path):
+    def __init__(
+        self,
+        client: VictorOpsClient,
+        output_dir: Path,
+        reporter: Optional[SummaryReporter] = None,
+    ):
         self.client = client
         self.output_dir = output_dir
-        self.inventory_counts = {}
+        self.inventory_counts: InventoryCounts = {}
+        self.reporter = reporter or SummaryReporter(output_dir, client.org_slug, self.inventory_counts)
 
     def save_json(self, name: str, data: Any):
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -267,7 +262,17 @@ class DiscoveryPipeline:
         log.info(f"Output directory: {self.output_dir.resolve()}")
         log.info("=" * 60)
 
-        # Phase 1: Global entities
+        users, teams = self._process_global_entities()
+        self._process_user_scoped_entities(users)
+        policies_list = self._process_team_scoped_entities(teams)
+        if policies_list is not None:
+            self._process_policy_details(policies_list)
+
+        elapsed = time.monotonic() - start_time
+        self._finalize_run(elapsed)
+        return self.inventory_counts
+
+    def _process_global_entities(self) -> Tuple[List[Any], List[Any]]:
         log.info("[Phase 1/4] Fetching global entities...")
         users = self.extract_list(self.client.get("user", required=True), "users")
         self.save_json("users_inventory", users)
@@ -294,8 +299,9 @@ class DiscoveryPipeline:
         self.inventory_counts["outbound_webhooks_inventory"] = len(webhooks)
 
         self.inventory_counts["integrations_inventory"] = 0
+        return users, teams
 
-        # Phase 2: User-scoped
+    def _process_user_scoped_entities(self, users: List[Any]) -> None:
         if users:
             log.info(f"\n[Phase 2/4] Fetching user-scoped entities ({len(users)} users)...")
             log.info("Fetching User Contact Methods...")
@@ -311,81 +317,14 @@ class DiscoveryPipeline:
             )
             self.save_json("paging_policies_inventory", paging_policies)
             self.inventory_counts["paging_policies_inventory"] = len(paging_policies)
-        else:
-            log.warning("[Phase 2/4] No users found — skipping user-scoped entities.")
-            self.inventory_counts["contact_methods_inventory"] = 0
-            self.inventory_counts["paging_policies_inventory"] = 0
+            return
 
-        # Phase 3: Team-scoped
-        if teams:
-            log.info(f"\n[Phase 3/4] Fetching team-scoped entities ({len(teams)} teams)...")
-            # Fetching Members
-            log.info("Fetching Team Members...")
-            team_members = self.fetch_per_entity_concurrent(
-                teams, "slug", lambda t: f"team/{t}/members", "team"
-            )
-            self.save_json("team_members_inventory", team_members)
-            self.inventory_counts["team_members_inventory"] = len(team_members)
+        log.warning("[Phase 2/4] No users found — skipping user-scoped entities.")
+        self.inventory_counts["contact_methods_inventory"] = 0
+        self.inventory_counts["paging_policies_inventory"] = 0
 
-            log.info("Fetching Team Admins...")
-            team_admins = self.fetch_per_entity_concurrent(
-                teams, "slug", lambda t: f"team/{t}/admins", "team"
-            )
-            self.save_json("team_admins_inventory", team_admins)
-            self.inventory_counts["team_admins_inventory"] = len(team_admins)
-
-            log.info("Fetching Team Rotation Definitions...")
-            rotations = self.fetch_per_entity_concurrent(
-                teams,
-                "slug",
-                lambda t: f"team/{t}/rotations",
-                "team",
-                use_v2=True,
-                paginate=False,
-            )
-            self.save_json("rotation_definitions_inventory", rotations)
-            self.inventory_counts["rotation_definitions_inventory"] = len(rotations)
-
-            # Escalation Policies
-            log.info("Fetching Escalation Policies summaries...")
-            policies_raw = self.client.get("policies", required=True)
-            policies_list = self.extract_list(policies_raw, "policies")
-
-            # Grouping Logic
-            grouped_policies = {}
-            for p in policies_list:
-                tslug = (p.get("team") or {}).get("slug")
-                if tslug: grouped_policies.setdefault(tslug, []).append(p)
-
-            self.save_json("escalation_policies_inventory", grouped_policies)
-            self.inventory_counts["escalation_policies_inventory"] = len(grouped_policies)
-
-            log.info("Fetching On-Call Schedules v2...")
-            schedules = self.fetch_per_entity_concurrent(
-                teams, "slug", lambda t: f"team/{t}/oncall/schedule", "team", use_v2=True
-            )
-            self.save_json("schedules_inventory", schedules)
-            self.inventory_counts["schedules_inventory"] = len(schedules)
-
-            overrides = self.get_scheduled_overrides()
-            self.save_json("scheduled_overrides_inventory", overrides)
-            self.inventory_counts["scheduled_overrides_inventory"] = len(overrides)
-
-            log.info("\n[Phase 4/4] Fetching escalation policy details...")
-            unique_slugs = {
-                p.get("policy", {}).get("slug")
-                for p in policies_list
-                if p.get("policy", {}).get("slug")
-            }
-            policy_slugs = sorted(unique_slugs)
-
-            log.info(f"Fetching {len(policy_slugs)} unique policy details...")
-            policy_details = self.fetch_per_entity_concurrent(
-                [{"slug": s} for s in policy_slugs], "slug", lambda s: f"policies/{s}", "policy"
-            )
-            self.save_json("escalation_policy_details_inventory", policy_details)
-            self.inventory_counts["escalation_policy_details_inventory"] = len(policy_details)
-        else:
+    def _process_team_scoped_entities(self, teams: List[Any]) -> Optional[List[Any]]:
+        if not teams:
             log.warning("[Phase 3/4] No teams found — skipping team-scoped entities.")
             self.inventory_counts["team_members_inventory"] = 0
             self.inventory_counts["team_admins_inventory"] = 0
@@ -394,16 +333,84 @@ class DiscoveryPipeline:
             self.inventory_counts["schedules_inventory"] = 0
             self.inventory_counts["scheduled_overrides_inventory"] = 0
             self.inventory_counts["escalation_policy_details_inventory"] = 0
+            return None
 
-        elapsed = time.monotonic() - start_time
+        log.info(f"\n[Phase 3/4] Fetching team-scoped entities ({len(teams)} teams)...")
+        log.info("Fetching Team Members...")
+        team_members = self.fetch_per_entity_concurrent(
+            teams, "slug", lambda t: f"team/{t}/members", "team"
+        )
+        self.save_json("team_members_inventory", team_members)
+        self.inventory_counts["team_members_inventory"] = len(team_members)
+
+        log.info("Fetching Team Admins...")
+        team_admins = self.fetch_per_entity_concurrent(
+            teams, "slug", lambda t: f"team/{t}/admins", "team"
+        )
+        self.save_json("team_admins_inventory", team_admins)
+        self.inventory_counts["team_admins_inventory"] = len(team_admins)
+
+        log.info("Fetching Team Rotation Definitions...")
+        rotations = self.fetch_per_entity_concurrent(
+            teams,
+            "slug",
+            lambda t: f"team/{t}/rotations",
+            "team",
+            use_v2=True,
+            paginate=False,
+        )
+        self.save_json("rotation_definitions_inventory", rotations)
+        self.inventory_counts["rotation_definitions_inventory"] = len(rotations)
+
+        log.info("Fetching Escalation Policies summaries...")
+        policies_raw = self.client.get("policies", required=True)
+        policies_list = self.extract_list(policies_raw, "policies")
+
+        grouped_policies = {}
+        for policy in policies_list:
+            tslug = (policy.get("team") or {}).get("slug")
+            if tslug:
+                grouped_policies.setdefault(tslug, []).append(policy)
+
+        self.save_json("escalation_policies_inventory", grouped_policies)
+        self.inventory_counts["escalation_policies_inventory"] = len(grouped_policies)
+
+        log.info("Fetching On-Call Schedules v2...")
+        schedules = self.fetch_per_entity_concurrent(
+            teams, "slug", lambda t: f"team/{t}/oncall/schedule", "team", use_v2=True
+        )
+        self.save_json("schedules_inventory", schedules)
+        self.inventory_counts["schedules_inventory"] = len(schedules)
+
+        overrides = self.get_scheduled_overrides()
+        self.save_json("scheduled_overrides_inventory", overrides)
+        self.inventory_counts["scheduled_overrides_inventory"] = len(overrides)
+        return policies_list
+
+    def _process_policy_details(self, policies_list: List[Any]) -> None:
+        log.info("\n[Phase 4/4] Fetching escalation policy details...")
+        unique_slugs = {
+            policy.get("policy", {}).get("slug")
+            for policy in policies_list
+            if policy.get("policy", {}).get("slug")
+        }
+        policy_slugs = sorted(unique_slugs)
+
+        log.info(f"Fetching {len(policy_slugs)} unique policy details...")
+        policy_details = self.fetch_per_entity_concurrent(
+            [{"slug": slug} for slug in policy_slugs], "slug", lambda slug: f"policies/{slug}", "policy"
+        )
+        self.save_json("escalation_policy_details_inventory", policy_details)
+        self.inventory_counts["escalation_policy_details_inventory"] = len(policy_details)
+
+    def _finalize_run(self, elapsed: float) -> None:
         self.save_metadata(elapsed)
-        self.save_inventory_summary(elapsed)
+        self.reporter.write_summary(elapsed)
 
         minutes, seconds = divmod(int(elapsed), 60)
         log.info("=" * 60)
         log.info(f"Discovery complete in {minutes}m {seconds:02d}s.")
         log.info("=" * 60)
-        return self.inventory_counts
 
     def save_metadata(self, elapsed_seconds: float):
         files_written = [
@@ -426,189 +433,6 @@ class DiscoveryPipeline:
             }
         }
         self.save_json("discovery_metadata", metadata)
-
-    def _load_inventory_json(self, name: str) -> Any:
-        path = self.output_dir / f"{name}.json"
-        if not path.exists():
-            return None
-        return json.loads(path.read_text())
-
-    def _format_duration(self, elapsed_seconds: float) -> str:
-        minutes, seconds = divmod(int(elapsed_seconds), 60)
-        return f"{minutes}m {seconds:02d}s"
-
-    def _team_slug_from_url(self, url: str) -> str:
-        if not url:
-            return ""
-        return url.rstrip("/").split("/")[-1]
-
-    def _rotation_labels(self, rotation_data: Any) -> str:
-        if not isinstance(rotation_data, dict):
-            return ""
-        rotations = rotation_data.get("rotations") or []
-        labels = [
-            r.get("label", "")
-            for r in rotations
-            if isinstance(r, dict) and r.get("label")
-        ]
-        return ", ".join(labels)
-
-    def _md_cell(self, value: Any) -> str:
-        return str(value).replace("|", "\\|").replace("\n", " ")
-
-    def save_inventory_summary(self, elapsed_seconds: float) -> None:
-        """Write a human-readable Markdown catalog from saved inventory JSON."""
-        exported_at = datetime.now(timezone.utc).isoformat()
-        lines = [
-            "# Splunk On-Call Inventory Summary",
-            "",
-            f"**Org:** {self.client.org_slug}  ",
-            f"**Exported:** {exported_at}  ",
-            f"**Duration:** {self._format_duration(elapsed_seconds)}",
-            "",
-            "## Inventory Counts",
-            "",
-            "| File | Count |",
-            "| --- | ---: |",
-        ]
-
-        for name, count in sorted(self.inventory_counts.items()):
-            lines.append(f"| `{name}.json` | {count} |")
-
-        teams = self._load_inventory_json("teams_inventory") or []
-        team_members = self._load_inventory_json("team_members_inventory") or {}
-        team_admins = self._load_inventory_json("team_admins_inventory") or {}
-        rotations = self._load_inventory_json("rotation_definitions_inventory") or {}
-        escalation_policies = self._load_inventory_json("escalation_policies_inventory") or {}
-
-        lines.extend(["", f"## Teams ({len(teams)})", ""])
-        if teams:
-            lines.extend([
-                "| Name | Slug | Members | Admins | Rotations | Escalation Policies |",
-                "| --- | --- | ---: | ---: | --- | ---: |",
-            ])
-            for team in sorted(teams, key=lambda t: (t.get("name") or "").lower()):
-                if not isinstance(team, dict):
-                    continue
-                slug = team.get("slug", "")
-                name = team.get("name", "")
-                member_count = len(team_members.get(slug, [])) if isinstance(team_members, dict) else 0
-                admin_count = len(team_admins.get(slug, [])) if isinstance(team_admins, dict) else 0
-                rotation_labels = self._rotation_labels(rotations.get(slug) if isinstance(rotations, dict) else None)
-                policy_count = len(escalation_policies.get(slug, [])) if isinstance(escalation_policies, dict) else 0
-                lines.append(
-                    f"| {self._md_cell(name)} | {self._md_cell(slug)} | {member_count} | "
-                    f"{admin_count} | {self._md_cell(rotation_labels)} | {policy_count} |"
-                )
-        else:
-            lines.append("_No teams exported._")
-
-        routing_keys = self._load_inventory_json("routing_keys_inventory") or []
-        lines.extend(["", f"## Routing Keys ({len(routing_keys)})", ""])
-        if routing_keys:
-            lines.extend([
-                "| Routing Key | Target Policy | Team Slug |",
-                "| --- | --- | --- |",
-            ])
-            for rk in sorted(routing_keys, key=lambda r: (r.get("routingKey") or "").lower()):
-                if not isinstance(rk, dict):
-                    continue
-                key = rk.get("routingKey", "")
-                targets = rk.get("targets") or []
-                target = targets[0] if targets and isinstance(targets[0], dict) else {}
-                policy_name = target.get("policyName", "")
-                team_slug = self._team_slug_from_url(target.get("_teamUrl", ""))
-                lines.append(
-                    f"| {self._md_cell(key)} | {self._md_cell(policy_name)} | {self._md_cell(team_slug)} |"
-                )
-        else:
-            lines.append("_No routing keys exported._")
-
-        alert_rules = self._load_inventory_json("alert_rules_inventory") or []
-        lines.extend(["", f"## Alert Rules ({len(alert_rules)})", ""])
-        if alert_rules:
-            lines.extend([
-                "| Rank | Field | Match | Match Type | Stop |",
-                "| ---: | --- | --- | --- | :---: |",
-            ])
-            for rule in sorted(alert_rules, key=lambda r: r.get("rank", 0)):
-                if not isinstance(rule, dict):
-                    continue
-                lines.append(
-                    f"| {rule.get('rank', '')} | {self._md_cell(rule.get('alertField', ''))} | "
-                    f"{self._md_cell(rule.get('alertValueMatch', ''))} | "
-                    f"{self._md_cell(rule.get('matchType', ''))} | "
-                    f"{'Yes' if rule.get('stopFlag') else 'No'} |"
-                )
-        else:
-            lines.append("_No alert rules exported._")
-
-        webhooks = self._load_inventory_json("outbound_webhooks_inventory") or []
-        lines.extend(["", f"## Outbound Webhooks ({len(webhooks)})", ""])
-        if webhooks:
-            lines.extend([
-                "| Label | Slug |",
-                "| --- | --- |",
-            ])
-            for wh in webhooks:
-                if not isinstance(wh, dict):
-                    continue
-                lines.append(
-                    f"| {self._md_cell(wh.get('label', ''))} | {self._md_cell(wh.get('slug', ''))} |"
-                )
-        else:
-            lines.append("_No outbound webhooks exported._")
-
-        users = self._load_inventory_json("users_inventory") or []
-        lines.extend(["", f"## Users ({len(users)})", ""])
-        if users:
-            lines.extend([
-                "| Username | Display Name |",
-                "| --- | --- |",
-            ])
-            for user in sorted(users, key=lambda u: (u.get("username") or "").lower()):
-                if not isinstance(user, dict):
-                    continue
-                lines.append(
-                    f"| {self._md_cell(user.get('username', ''))} | "
-                    f"{self._md_cell(user.get('displayName', ''))} |"
-                )
-        else:
-            lines.append("_No users exported._")
-
-        overrides = self._load_inventory_json("scheduled_overrides_inventory") or {}
-        override_buckets = len(overrides) if isinstance(overrides, dict) else 0
-        active_overrides = (
-            sum(len(v) for v in overrides.values())
-            if isinstance(overrides, dict)
-            else 0
-        )
-        lines.extend([
-            "",
-            "## Scheduled Overrides",
-            "",
-            f"- **Team buckets:** {override_buckets}",
-            f"- **Active overrides:** {active_overrides}",
-            "",
-            "## Manual Capture Required",
-            "",
-            "- integrations",
-            "- user_permissions",
-            "- sso_settings",
-            "",
-            "## Notes",
-            "",
-            "Integrations are not exported via the public API. See "
-            "`manual_capture/README.md` for manual capture steps.",
-            "",
-        ])
-
-        self.output_dir.mkdir(parents=True, exist_ok=True)
-        path = self.output_dir / "inventory_summary.md"
-        temp_path = path.with_suffix(".tmp")
-        temp_path.write_text("\n".join(lines))
-        temp_path.replace(path)
-        log.info("  -> Saved inventory summary to inventory_summary.md")
 
 
 def main():

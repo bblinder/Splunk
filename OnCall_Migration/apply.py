@@ -12,35 +12,19 @@ import json
 import logging
 import os
 import sys
-import threading
-import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from env_loader import PROJECT_ROOT, load_dotenv
+from utils import RateLimiter
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S")
 log = logging.getLogger(__name__)
-
-
-class RateLimiter:
-    def __init__(self, rate_hz: float = 2.0):
-        self.delay = 1.0 / rate_hz
-        self.last_call = 0.0
-        self.lock = threading.Lock()
-
-    def wait(self) -> None:
-        with self.lock:
-            now = time.monotonic()
-            elapsed = now - self.last_call
-            if elapsed < self.delay:
-                time.sleep(self.delay - elapsed)
-            self.last_call = time.monotonic()
 
 
 class RemappingContext:
@@ -140,7 +124,7 @@ class ApplyPipeline:
     def run(self) -> Dict[str, Any]:
         self._index_policy_metadata()
         self._index_rotation_group_labels()
-        steps = [
+        steps: List[Tuple[str, Callable[[], None]]] = [
             ("users", self.apply_users),
             ("teams", self.apply_teams),
             ("members", self.apply_members),
@@ -150,11 +134,16 @@ class ApplyPipeline:
             ("routing_keys", self.apply_routing_keys),
             ("alert_rules", self.apply_alert_rules),
         ]
+        self._run_steps(steps)
+        return self._write_report()
+
+    def _run_steps(self, steps: List[Tuple[str, Callable[[], None]]]) -> None:
         for name, func in steps:
             log.info("=" * 60)
             log.info(f"Apply step: {name}")
             func()
 
+    def _write_report(self) -> Dict[str, Any]:
         report = {
             "org_slug": self.client.org_slug,
             "applied_at": datetime.now(timezone.utc).isoformat(),
