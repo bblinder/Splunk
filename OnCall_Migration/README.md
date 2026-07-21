@@ -1,6 +1,6 @@
 # Splunk On-Call Migration Tools
 
-A migration toolset for Splunk On-Call (VictorOps) configurations from a source organization to a target organization using an automated inventory discovery and remapping workflow.
+A migration toolset for Splunk On-Call (VictorOps). Snapshot and migrate configurations from a source organization to a target organization using an automated inventory discovery and remapping workflow.
 
 ## Repository layout
 
@@ -44,7 +44,7 @@ OnCall_Migration/
 └── discovery_run.log             # gitignored — discovery HTTP log
 ```
 
-Paths marked **gitignored** are local operator artifacts; back them up before source org access ends.
+Paths marked **gitignored** are local operator artifacts; back them up before source org access ends. **Do not commit any changes to these paths.**
 
 ## Quick Start
 
