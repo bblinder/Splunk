@@ -50,7 +50,9 @@ Follow these steps in order to migrate your configuration:
 6. **Apply**: Execute the migration to the target organization.
    `python3 apply.py --apply`
 
-Optional `apply.py` flags: `--inventory` (default `inventory`), `--remapping` (default `inventory/remapping.json`). See the Migration Guide for details.
+Optional path flags: `--inventory` (default `inventory`), `--remapping` (default `inventory/remapping.json`) on `generate_remapping.py`, `validate_apply.py`, and `apply.py`; `--inventory` on `discovery.py` and `validate_inventory.py`. See the Migration Guide CLI reference.
+
+All pipeline scripts accept `-h` / `--help` for flags and defaults.
 
 **uv:** Prefix commands with `uv run`. Without a venv: `uv run --with requests python3 <script>.py`.
 

@@ -1,6 +1,14 @@
 #!/usr/bin/env python3
-"""Validate on-disk inventory consistency after discovery (no API calls)."""
+"""
+Validate on-disk inventory consistency after discovery (no API calls).
 
+Usage:
+    python3 validate_inventory.py
+    python3 validate_inventory.py -h
+    python3 validate_inventory.py --inventory inventory
+"""
+
+import argparse
 import json
 import logging
 import sys
@@ -9,6 +17,20 @@ from typing import Any
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 log = logging.getLogger(__name__)
+
+
+def _build_arg_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Validate on-disk inventory consistency after discovery (no API calls).",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument("--inventory", default="inventory", help="Inventory directory path.")
+    return parser
+
+
+if __name__ == "__main__" and any(flag in sys.argv for flag in ("-h", "--help")):
+    _build_arg_parser().parse_args()
+
 
 TEAM_SCOPED_FILES = (
     "team_members_inventory",
@@ -144,8 +166,10 @@ class InventoryValidator:
                     )
 
 
-def main() -> None:
-    validator = InventoryValidator(Path("inventory"))
+def main(argv: list[str] | None = None) -> None:
+    args = _build_arg_parser().parse_args(argv)
+
+    validator = InventoryValidator(Path(args.inventory))
     exit_code = validator.validate()
     if exit_code:
         sys.exit(exit_code)

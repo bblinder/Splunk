@@ -81,6 +81,18 @@ python3 discovery.py
 
 Replace `discovery.py` with any pipeline script (`validate_inventory.py`, `generate_remapping.py`, `validate_apply.py`, `apply.py`).
 
+Every pipeline script supports `-h` / `--help` for flags and defaults (e.g. `python3 apply.py -h`).
+
+### CLI reference
+
+| Script | Flags | Default paths |
+| :--- | :--- | :--- |
+| `discovery.py` | `--inventory` | `inventory` |
+| `validate_inventory.py` | `--inventory` | `inventory` |
+| `generate_remapping.py` | `--inventory`, `--remapping` | `inventory`, `inventory/remapping.json` |
+| `validate_apply.py` | `--inventory`, `--remapping` | same |
+| `apply.py` | `--apply`, `--inventory`, `--remapping` | same |
+
 **Run tests:**
 
 ```bash
@@ -195,6 +207,7 @@ TARGET_SPLUNK_ONCALL_ORG_SLUG
 ### Commands
 
 ```bash
+python3 apply.py -h                                           # flags and defaults
 python3 apply.py                                              # dry-run (default)
 python3 apply.py --apply                                      # execute writes
 python3 apply.py --inventory inventory --remapping inventory/remapping.json

@@ -106,7 +106,7 @@ class PreFlightValidatorTest(unittest.TestCase):
                 with mock.patch("validate_apply.PreFlightValidator", return_value=validator):
                     import validate_apply
 
-                    validate_apply.main()
+                    validate_apply.main([])
         mock_exit.assert_called_once_with(2)
 
 

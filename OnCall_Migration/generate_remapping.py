@@ -1,13 +1,36 @@
 #!/usr/bin/env python3
-"""Build inventory/remapping.json from discovery inventory files."""
+"""
+Build inventory/remapping.json from discovery inventory files.
 
+Usage:
+    python3 generate_remapping.py
+    python3 generate_remapping.py -h
+    python3 generate_remapping.py --inventory inventory --remapping inventory/remapping.json
+"""
+
+import argparse
 import json
 import logging
+import sys
 from pathlib import Path
 from typing import Any, Dict
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S")
 log = logging.getLogger(__name__)
+
+
+def _build_arg_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Build remapping.json from discovery inventory files.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument("--inventory", default="inventory", help="Inventory directory path.")
+    parser.add_argument("--remapping", default="inventory/remapping.json", help="Remapping output file path.")
+    return parser
+
+
+if __name__ == "__main__" and any(flag in sys.argv for flag in ("-h", "--help")):
+    _build_arg_parser().parse_args()
 
 
 class RemappingGenerator:
@@ -91,6 +114,12 @@ class RemappingGenerator:
         return remapping
 
 
-if __name__ == "__main__":
-    generator = RemappingGenerator(Path("inventory"), Path("inventory/remapping.json"))
+def main(argv: list[str] | None = None) -> None:
+    args = _build_arg_parser().parse_args(argv)
+
+    generator = RemappingGenerator(Path(args.inventory), Path(args.remapping))
     generator.generate()
+
+
+if __name__ == "__main__":
+    main()

@@ -3,15 +3,35 @@
 Apply Splunk On-Call inventory to a target org using remapping.json.
 
 Dry-run by default. Pass --apply to execute writes.
+
+Usage:
+    python3 apply.py
+    python3 apply.py -h
+    python3 apply.py --apply --inventory inventory --remapping inventory/remapping.json
 """
 
 from __future__ import annotations
 
 import argparse
+import sys
+
+def _build_arg_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Apply Splunk On-Call inventory to target org.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument("--apply", action="store_true", help="Execute writes (default is dry-run).")
+    parser.add_argument("--inventory", default="inventory", help="Inventory directory path.")
+    parser.add_argument("--remapping", default="inventory/remapping.json", help="Remapping file path.")
+    return parser
+
+
+if __name__ == "__main__" and any(flag in sys.argv for flag in ("-h", "--help")):
+    _build_arg_parser().parse_args()
+
 import json
 import logging
 import os
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
@@ -565,12 +585,8 @@ class ApplyPipeline:
                 self._bump("alert_rules", "failed")
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Apply Splunk On-Call inventory to target org.")
-    parser.add_argument("--apply", action="store_true", help="Execute writes (default is dry-run).")
-    parser.add_argument("--inventory", default="inventory", help="Inventory directory path.")
-    parser.add_argument("--remapping", default="inventory/remapping.json", help="Remapping file path.")
-    args = parser.parse_args()
+def main(argv: list[str] | None = None) -> None:
+    args = _build_arg_parser().parse_args(argv)
 
     env_path = load_dotenv()
     if env_path:

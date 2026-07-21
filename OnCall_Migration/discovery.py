@@ -5,6 +5,8 @@ Export discoverable Splunk On-Call (VictorOps) configuration from the source org
 Usage:
     cp .env.example .env   # set SOURCE_SPLUNK_ONCALL_API_ID, API_KEY, ORG_SLUG
     python3 discovery.py
+    python3 discovery.py -h
+    python3 discovery.py --inventory inventory
 
     # uv (with project .venv):
     uv run python3 discovery.py
@@ -17,11 +19,25 @@ Output: inventory/*.json, inventory_summary.md, discovery_metadata.json
 Next steps: validate_inventory.py, generate_remapping.py, validate_apply.py, apply.py
 """
 
+import argparse
+import sys
+
+def _build_arg_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Export discoverable Splunk On-Call config from the source org to JSON.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument("--inventory", default="inventory", help="Output directory for inventory JSON.")
+    return parser
+
+
+if __name__ == "__main__" and any(flag in sys.argv for flag in ("-h", "--help")):
+    _build_arg_parser().parse_args()
+
 import itertools
 import json
 import logging
 import os
-import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
@@ -435,7 +451,9 @@ class DiscoveryPipeline:
         self.save_json("discovery_metadata", metadata)
 
 
-def main():
+def main(argv: Optional[List[str]] = None) -> None:
+    args = _build_arg_parser().parse_args(argv)
+
     env_path = load_dotenv()
     if env_path:
         log.info(f"Loaded environment from {env_path}")
@@ -451,7 +469,7 @@ def main():
         sys.exit(1)
 
     client = VictorOpsClient(api_id, api_key, org_slug)
-    pipeline = DiscoveryPipeline(client, Path("inventory"))
+    pipeline = DiscoveryPipeline(client, Path(args.inventory))
     pipeline.run()
 
 if __name__ == "__main__":

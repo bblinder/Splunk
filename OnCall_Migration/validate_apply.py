@@ -1,6 +1,14 @@
 #!/usr/bin/env python3
-"""Pre-flight checks for remapping.json against inventory (no API calls)."""
+"""
+Pre-flight checks for remapping.json against inventory (no API calls).
 
+Usage:
+    python3 validate_apply.py
+    python3 validate_apply.py -h
+    python3 validate_apply.py --inventory inventory --remapping inventory/remapping.json
+"""
+
+import argparse
 import json
 import logging
 import re
@@ -10,6 +18,20 @@ from typing import Any, Dict
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 log = logging.getLogger(__name__)
+
+
+def _build_arg_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Pre-flight checks for remapping.json against inventory (no API calls).",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument("--inventory", default="inventory", help="Inventory directory path.")
+    parser.add_argument("--remapping", default="inventory/remapping.json", help="Remapping file path.")
+    return parser
+
+
+if __name__ == "__main__" and any(flag in sys.argv for flag in ("-h", "--help")):
+    _build_arg_parser().parse_args()
 
 
 class PreFlightValidator:
@@ -234,8 +256,10 @@ class PreFlightValidator:
                 )
 
 
-def main() -> None:
-    validator = PreFlightValidator(Path("inventory"), Path("inventory/remapping.json"))
+def main(argv: list[str] | None = None) -> None:
+    args = _build_arg_parser().parse_args(argv)
+
+    validator = PreFlightValidator(Path(args.inventory), Path(args.remapping))
     exit_code = validator.validate()
     if exit_code:
         sys.exit(exit_code)
