@@ -50,6 +50,46 @@ Terraform was evaluated and rejected for the apply step: the `splunk/victorops` 
 
 ## Repository layout
 
+```
+OnCall_Migration/
+├── README.md
+├── requirements.txt
+├── .env.example                  # copy to .env (gitignored)
+├── discovery.py                  # step 1 — export source org
+├── validate_inventory.py         # step 2
+├── generate_remapping.py         # step 3
+├── validate_apply.py             # step 4
+├── apply.py                      # steps 5–6 (dry-run / --apply)
+├── utils/
+│   ├── env_loader.py
+│   ├── rate_limiter.py
+│   ├── exceptions.py
+│   ├── migration_types.py
+│   └── summary_reporter.py
+├── docs/
+│   ├── MIGRATION_GUIDE.md
+│   ├── VALIDATION_REPORT.md
+│   ├── HANDOFF_PROMPT.MD
+│   └── SABRE_STAKEHOLDER_QUESTIONS.md
+├── tests/
+│   ├── test_discovery.py
+│   ├── test_apply.py
+│   └── …                         # other test_*.py modules
+├── inventory/                    # gitignored — API export + remapping
+│   ├── *_inventory.json
+│   ├── discovery_metadata.json
+│   ├── inventory_summary.md
+│   ├── remapping.json
+│   └── apply_report.json         # written after apply
+├── manual_capture/               # gitignored — portal / IdP gaps
+│   ├── README.md
+│   ├── capture_status.json
+│   ├── integrations/
+│   ├── user_permissions/
+│   └── sso/
+└── discovery_run.log             # gitignored — discovery HTTP log
+```
+
 | Path | Purpose |
 | :--- | :--- |
 | `discovery.py` | Read-only exporter. Four-phase pipeline; threaded per-entity fetch with shared 2 req/sec limit |
@@ -57,11 +97,11 @@ Terraform was evaluated and rejected for the apply step: the `splunk/victorops` 
 | `generate_remapping.py` | Build `remapping.json` template from inventory |
 | `validate_apply.py` | Pre-flight remapping + relational integrity checks |
 | `apply.py` | Target-org provisioning (dry-run default; `--apply` to write) |
-| `env_loader.py` | Project-root `.env` loading (shared by `discovery.py` and `apply.py`) |
-| `utils.py` | Shared `RateLimiter` (VictorOps API throttle) |
-| `summary_reporter.py` | Markdown `inventory_summary.md` generation from on-disk JSON |
-| `exceptions.py` | `MigrationError`, `NetworkError`, `ApiError` |
-| `migration_types.py` | Shared type aliases (`InventoryCounts`, etc.) |
+| `utils/env_loader.py` | Project-root `.env` loading (shared by `discovery.py` and `apply.py`) |
+| `utils/rate_limiter.py` | Shared `RateLimiter` (VictorOps API throttle) |
+| `utils/summary_reporter.py` | Markdown `inventory_summary.md` generation from on-disk JSON |
+| `utils/exceptions.py` | `MigrationError`, `NetworkError`, `ApiError` |
+| `utils/migration_types.py` | Shared type aliases (`InventoryCounts`, etc.) |
 | `tests/` | Mocked unit tests (no live API calls) |
 | `docs/` | Migration guide and post-discovery validation template (`VALIDATION_REPORT.md`) |
 | `inventory/` | API export output and `remapping.json` (gitignored) |
@@ -151,7 +191,7 @@ Incidents, alerts, point-in-time on-call snapshots, expired overrides, reporting
 
 - `VictorOpsClient.get()` returns full dicts for multi-list responses (e.g. contact methods)
 - `required=True` on critical endpoints raises `ApiError` on 404; network failures raise `NetworkError`
-- Shared `RateLimiter` in `utils.py` used by discovery and apply clients (~2 req/sec)
+- Shared `RateLimiter` in `utils/rate_limiter.py` used by discovery and apply clients (~2 req/sec)
 - `SummaryReporter` (injected into `DiscoveryPipeline`) writes `inventory_summary.md` from on-disk JSON only
 - Overrides fetched org-wide via `GET /overrides`, filtered to active only
 - Escalation policies: global `GET /policies` grouped by team; details via `GET /policies/{slug}`

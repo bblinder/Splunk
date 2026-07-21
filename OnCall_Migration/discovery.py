@@ -48,11 +48,11 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-from env_loader import PROJECT_ROOT, load_dotenv
-from exceptions import ApiError, NetworkError
-from summary_reporter import SummaryReporter
-from migration_types import InventoryCounts
-from utils import RateLimiter
+from utils.env_loader import PROJECT_ROOT, load_dotenv
+from utils.exceptions import ApiError, NetworkError
+from utils.summary_reporter import SummaryReporter
+from utils.migration_types import InventoryCounts
+from utils.rate_limiter import RateLimiter
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S")
 log = logging.getLogger(__name__)

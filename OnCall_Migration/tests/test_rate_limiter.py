@@ -1,16 +1,16 @@
-"""Unit tests for utils.py."""
+"""Unit tests for utils.rate_limiter."""
 
 from __future__ import annotations
 
 import unittest
 from unittest import mock
 
-from utils import RateLimiter
+from utils.rate_limiter import RateLimiter
 
 
 class RateLimiterTest(unittest.TestCase):
-    @mock.patch("utils.time.sleep")
-    @mock.patch("utils.time.monotonic")
+    @mock.patch("utils.rate_limiter.time.sleep")
+    @mock.patch("utils.rate_limiter.time.monotonic")
     def test_wait_enforces_minimum_spacing(self, mock_monotonic: mock.Mock, mock_sleep: mock.Mock) -> None:
         mock_monotonic.side_effect = [1.0, 1.0, 1.1, 1.1]
         limiter = RateLimiter(rate_hz=2.0)

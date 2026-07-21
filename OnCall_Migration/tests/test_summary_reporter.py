@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from summary_reporter import SummaryReporter
+from utils.summary_reporter import SummaryReporter
 
 
 class SummaryReporterTest(unittest.TestCase):

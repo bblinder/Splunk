@@ -1,4 +1,4 @@
-"""Shared utilities for Splunk On-Call migration scripts."""
+"""Thread-safe rate limiting for VictorOps API calls."""
 
 from __future__ import annotations
 

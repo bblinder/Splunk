@@ -15,7 +15,7 @@ os.environ.setdefault("SOURCE_SPLUNK_ONCALL_API_KEY", "test-key")
 os.environ.setdefault("SOURCE_SPLUNK_ONCALL_ORG_SLUG", "test-org")
 
 from discovery import DiscoveryPipeline, VictorOpsClient
-from exceptions import ApiError
+from utils.exceptions import ApiError
 
 
 class FakeResponse:

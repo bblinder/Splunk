@@ -7,7 +7,7 @@ Use this document after each `discovery.py` run to record validation results. Co
 - `discovery_run.log` — HTTP errors and warnings
 - `inventory/*.json` — exported configuration
 
-Automated regression coverage: [`tests/`](../tests/) — includes `test_discovery.py`, `test_summary_reporter.py`, `test_utils.py`, and other pipeline tests.
+Automated regression coverage: [`tests/`](../tests/) — includes `test_discovery.py`, `test_summary_reporter.py`, `test_rate_limiter.py`, and other pipeline tests.
 
 ---
 

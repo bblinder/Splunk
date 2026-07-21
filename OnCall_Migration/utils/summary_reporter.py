@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict
 
-from migration_types import InventoryCounts
+from utils.migration_types import InventoryCounts
 
 log = logging.getLogger(__name__)
 

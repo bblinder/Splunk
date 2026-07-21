@@ -2,6 +2,50 @@
 
 A migration toolset for Splunk On-Call (VictorOps) configurations from a source organization to a target organization using an automated inventory discovery and remapping workflow.
 
+## Repository layout
+
+```
+OnCall_Migration/
+├── README.md
+├── requirements.txt
+├── .env.example                  # copy to .env (gitignored)
+├── discovery.py                  # step 1 — export source org
+├── validate_inventory.py         # step 2
+├── generate_remapping.py         # step 3
+├── validate_apply.py             # step 4
+├── apply.py                      # steps 5–6 (dry-run / --apply)
+├── utils/
+│   ├── env_loader.py
+│   ├── rate_limiter.py
+│   ├── exceptions.py
+│   ├── migration_types.py
+│   └── summary_reporter.py
+├── docs/
+│   ├── MIGRATION_GUIDE.md
+│   ├── VALIDATION_REPORT.md
+│   ├── HANDOFF_PROMPT.MD
+│   └── SABRE_STAKEHOLDER_QUESTIONS.md
+├── tests/
+│   ├── test_discovery.py
+│   ├── test_apply.py
+│   └── …                         # other test_*.py modules
+├── inventory/                    # gitignored — API export + remapping
+│   ├── *_inventory.json
+│   ├── discovery_metadata.json
+│   ├── inventory_summary.md
+│   ├── remapping.json
+│   └── apply_report.json         # written after apply
+├── manual_capture/               # gitignored — portal / IdP gaps
+│   ├── README.md
+│   ├── capture_status.json
+│   ├── integrations/
+│   ├── user_permissions/
+│   └── sso/
+└── discovery_run.log             # gitignored — discovery HTTP log
+```
+
+Paths marked **gitignored** are local operator artifacts; back them up before source org access ends.
+
 ## Quick Start
 
 ### Installation
@@ -77,7 +121,7 @@ The following are excluded from the automated run and may require manual handlin
 ### Documentation
 - **Migration Guide**: [`docs/MIGRATION_GUIDE.md`](docs/MIGRATION_GUIDE.md) (Schema, API notes, checklists, repository layout)
 - **Validation Template**: [`docs/VALIDATION_REPORT.md`](docs/VALIDATION_REPORT.md) (Template for recording results)
-- **Support modules**: `utils.py`, `summary_reporter.py`, `exceptions.py`, `migration_types.py`
+- **Support modules**: [`utils/`](utils/) — `env_loader`, `rate_limiter`, `exceptions`, `migration_types`, `summary_reporter`
 
 ## Tests
 ```bash

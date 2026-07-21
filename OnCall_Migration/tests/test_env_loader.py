@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from env_loader import load_dotenv
+from utils.env_loader import load_dotenv
 
 
 class EnvLoaderTest(unittest.TestCase):
