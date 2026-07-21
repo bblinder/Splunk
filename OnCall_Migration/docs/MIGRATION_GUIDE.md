@@ -33,8 +33,9 @@ Terraform was evaluated and rejected for the apply step: the `splunk/victorops` 
 
 ### Safety and important notes
 
-- **Dry runs:** Always run `python3 apply.py` without `--apply` first.
-- **Immutable resources:** Escalation policies are **immutable via API after creation**. Validate remapping carefully before `--apply`.
+- **Dry run first:** `python3 apply.py` (no `--apply`) simulates the migration and writes `inventory/apply_report.json` without changing the target org. Review that report before you run with `--apply`.
+- **Escalation policies cannot be edited later:** Once created in the target org, policy steps and routing cannot be changed through the API. Double-check `inventory/remapping.json` and run `python3 validate_apply.py` before applying.
+- **Re-running apply:** A second run is mostly safe for resources that already exist — users, teams, members, rotations, and escalation policies are skipped when found. Routing keys and alert rules are posted again and may fail or duplicate if they already exist. A policy created with wrong steps cannot be fixed by re-applying; fix it in the target UI or delete and recreate the policy manually, then adjust remapping if needed.
 - **Overwrites:** Re-running `generate_remapping.py` overwrites `inventory/remapping.json`. Back up manual edits first.
 
 ### Scope
@@ -243,6 +244,22 @@ flowchart LR
 | Escalation policies | `POST /policies` | **Immutable after create via API** — includes full steps |
 | Routing keys | `POST /org/routing-keys` | Target policy slugs from apply step |
 | Alert rules | `POST /alertRules` | Preserve `rank`; remap routing-key matches |
+
+### Re-running apply
+
+Apply is designed to be **partially idempotent**. If you run `python3 apply.py --apply` again with the same inventory and remapping:
+
+| Step | On re-run | If something was wrong the first time |
+| :--- | :--- | :--- |
+| Users | Skipped when target username already exists | Cannot rename via apply; adjust in target UI or set user to `null` in remapping |
+| Teams | Skipped when team **name** already exists | Slug comes from the API; remapping `teams` value is not sent on create |
+| Members | Skipped when user is already on the team | Safe to re-run to add missing members |
+| Rotations | Skipped when rotation **label** already exists on the team | Cannot update rotation config via re-apply |
+| Escalation policies | Skipped when `GET /policies/{source_slug}` finds a policy | **Steps cannot be updated via API** — fix in UI or delete/recreate manually |
+| Routing keys | Posted again (no duplicate check) | May error or duplicate; clean up in target UI before re-running |
+| Alert rules | Posted again (no duplicate check) | May error or duplicate; remove conflicting rules in target UI first |
+
+Use a dry run before any repeat apply and compare `inventory/apply_report.json` stats (`created` vs `skipped` vs `failed`). After the first successful apply, keep `apply_report.json` — its `slug_maps` show how source IDs mapped to target slugs for routing keys and policies.
 
 ### Remapping
 

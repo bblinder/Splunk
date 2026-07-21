@@ -1,6 +1,6 @@
 # Splunk On-Call Migration Tools
 
-This toolset facilitates the migration of Splunk On-Call (VictorOps) configurations from a source organization to a target organization using an automated inventory discovery and remapping workflow.
+A migration toolset for Splunk On-Call (VictorOps) configurations from a source organization to a target organization using an automated inventory discovery and remapping workflow.
 
 ## Quick Start
 
@@ -18,14 +18,14 @@ uv venv && uv pip install -r requirements.txt
 ### Configuration
 Create a `.env` file in the project root (copy from `.env.example`) and provide the following credentials. Scripts load `.env` from the project root automatically; shell `export` values override file settings.
 
-**Source Credentials (`discovery.py`):**
+**Source Credentials (used by `discovery.py`):**
 ```bash
 SOURCE_SPLUNK_ONCALL_API_ID=...
 SOURCE_SPLUNK_ONCALL_API_KEY=...
 SOURCE_SPLUNK_ONCALL_ORG_SLUG=...
 ```
 
-**Target Credentials (`apply.py`):**
+**Target Credentials (used by `apply.py`):**
 ```bash
 TARGET_SPLUNK_ONCALL_API_ID=...
 TARGET_SPLUNK_ONCALL_API_KEY=...
@@ -34,7 +34,7 @@ TARGET_SPLUNK_ONCALL_ORG_SLUG=...
 
 ## Migration Workflow
 
-Follow these steps in order to migrate your configuration:
+Follow these steps in order to migrate your Splunk On-Call configuration:
 
 1. **Discovery**: Extract the source organization state.
    `python3 discovery.py` (Expected duration: ~30–40 min for large orgs)
@@ -42,7 +42,7 @@ Follow these steps in order to migrate your configuration:
    `python3 validate_inventory.py`
 3. **Remapping**: Generate a template for mapping source IDs to target names/slugs.
    `python3 generate_remapping.py`
-   *Note: Edit `inventory/remapping.json` manually if needed. Set values to `null` to skip resources. Alert rules that match routing-key patterns may reference values not in `routing_keys_inventory`; add those keys to `remapping.json` manually or set the rule ID to `null` to skip.*
+   *Note: Edit `inventory/remapping.json` manually if needed. **Set values to `null` to skip resources**. Alert rules that match routing-key patterns may reference values not in `routing_keys_inventory`; add those keys to `remapping.json` manually or set the rule ID to `null` to skip.*
 4. **Pre-flight**: Validate the remapping logic before executing against the target.
    `python3 validate_apply.py`
 5. **Dry Run**: Perform a simulated application of changes (no writes).
@@ -52,15 +52,16 @@ Follow these steps in order to migrate your configuration:
 
 Optional path flags: `--inventory` (default `inventory`), `--remapping` (default `inventory/remapping.json`) on `generate_remapping.py`, `validate_apply.py`, and `apply.py`; `--inventory` on `discovery.py` and `validate_inventory.py`. See the Migration Guide CLI reference.
 
-All pipeline scripts accept `-h` / `--help` for flags and defaults.
+All pipeline scripts accept `-h` / `--help` for flags and defaults. See [`docs/MIGRATION_GUIDE.md`](docs/MIGRATION_GUIDE.md) for more detailed information on CLI/flags options.
 
 **uv:** Prefix commands with `uv run`. Without a venv: `uv run --with requests python3 <script>.py`.
 
 ## Safety & Important Notes
 
-- **Dry Runs**: Always run `python3 apply.py` without the `--apply` flag first to verify your changes.
-- **Immutable Resources**: Escalation policies are **immutable via API after creation**. Validate your remapping carefully before running with `--apply`.
-- **Overwrites**: Running `generate_remapping.py` will overwrite `inventory/remapping.json`. Back up any manual edits before re-running.
+- **Dry run first:** `python3 apply.py` (no `--apply`) simulates the migration and writes `inventory/apply_report.json` without changing the target org. Review that report before you run with `--apply`.
+- **Escalation policies cannot be edited later:** Once created in the target org, policy steps and routing cannot be changed through the API. Double-check `inventory/remapping.json` and run `python3 validate_apply.py` before applying.
+- **Re-running apply:** A second run is mostly safe for resources that already exist — users, teams, members, rotations, and escalation policies are skipped when found. Routing keys and alert rules are posted again and may fail or duplicate if they already exist. A policy created with wrong steps cannot be fixed by re-applying; fix it in the target UI or delete and recreate the policy manually, then adjust remapping if needed.
+- **Overwrites:** Running `generate_remapping.py` overwrites `inventory/remapping.json`. Back up any manual edits before re-running.
 
 ## Scope & Reference
 
