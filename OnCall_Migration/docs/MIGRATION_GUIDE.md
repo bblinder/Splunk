@@ -51,12 +51,16 @@ Terraform was evaluated and rejected for the apply step: the `splunk/victorops` 
 
 | Path | Purpose |
 | :--- | :--- |
-| `discovery.py` | Read-only exporter. Four-phase pipeline, serial API throttle |
+| `discovery.py` | Read-only exporter. Four-phase pipeline; threaded per-entity fetch with shared 2 req/sec limit |
 | `validate_inventory.py` | Post-discovery consistency checks (no API) |
 | `generate_remapping.py` | Build `remapping.json` template from inventory |
 | `validate_apply.py` | Pre-flight remapping + relational integrity checks |
 | `apply.py` | Target-org provisioning (dry-run default; `--apply` to write) |
 | `env_loader.py` | Project-root `.env` loading (shared by `discovery.py` and `apply.py`) |
+| `utils.py` | Shared `RateLimiter` (VictorOps API throttle) |
+| `summary_reporter.py` | Markdown `inventory_summary.md` generation from on-disk JSON |
+| `exceptions.py` | `MigrationError`, `NetworkError`, `ApiError` |
+| `migration_types.py` | Shared type aliases (`InventoryCounts`, etc.) |
 | `tests/` | Mocked unit tests (no live API calls) |
 | `docs/` | Migration guide and post-discovery validation template (`VALIDATION_REPORT.md`) |
 | `inventory/` | API export output and `remapping.json` (gitignored) |
@@ -118,7 +122,7 @@ Integrations are skipped — no public list endpoint exists.
 | `schedules_inventory.json` | Per-team | Computed on-call calendar (not rotation config) |
 | `scheduled_overrides_inventory.json` | Per-team | Active overrides only |
 | `discovery_metadata.json` | Global | Counts, timestamps, `files_written`, `manual_capture_required` |
-| `inventory_summary.md` | Global | Human-readable Markdown catalog |
+| `inventory_summary.md` | Global | Human-readable Markdown catalog (written by `SummaryReporter`) |
 | `remapping.json` | Global | Source-to-target identifier map (steps 3–5) |
 | `apply_report.json` | Global | Per-step apply stats and slug maps (after apply) |
 
@@ -133,7 +137,9 @@ Incidents, alerts, point-in-time on-call snapshots, expired overrides, reporting
 ### Key implementation notes
 
 - `VictorOpsClient.get()` returns full dicts for multi-list responses (e.g. contact methods)
-- `required=True` on critical endpoints raises on 404
+- `required=True` on critical endpoints raises `ApiError` on 404; network failures raise `NetworkError`
+- Shared `RateLimiter` in `utils.py` used by discovery and apply clients (~2 req/sec)
+- `SummaryReporter` (injected into `DiscoveryPipeline`) writes `inventory_summary.md` from on-disk JSON only
 - Overrides fetched org-wide via `GET /overrides`, filtered to active only
 - Escalation policies: global `GET /policies` grouped by team; details via `GET /policies/{slug}`
 - Rotations: `GET /v2/team/{slug}/rotations` (distinct from schedule calendar)
@@ -147,8 +153,8 @@ Three gaps have no public API. Capture from the Splunk On-Call portal and your i
 | Gap | Location | Source |
 | :--- | :--- | :--- |
 | Integrations | `manual_capture/integrations/` | Portal, Integrations |
-| User permissions | `manual_capture/user_permissions/` | Settings, Organization, Users |
-| SSO settings | `manual_capture/sso/` | IdP admin console |
+| User permissions | `manual_capture/user_permissions/admin_users.md` | Settings, Organization, Users |
+| SSO settings | `manual_capture/sso/idp_config.md` | IdP admin console |
 
 **Status tracker:** `manual_capture/capture_status.json`
 
@@ -189,9 +195,18 @@ TARGET_SPLUNK_ONCALL_ORG_SLUG
 ### Commands
 
 ```bash
-python3 apply.py           # dry-run (default)
-python3 apply.py --apply   # execute writes
+python3 apply.py                                              # dry-run (default)
+python3 apply.py --apply                                      # execute writes
+python3 apply.py --inventory inventory --remapping inventory/remapping.json
 ```
+
+| Flag | Default | Purpose |
+| :--- | :--- | :--- |
+| `--apply` | off | Execute writes (default is dry-run) |
+| `--inventory` | `inventory` | Inventory directory path |
+| `--remapping` | `inventory/remapping.json` | Remapping file path |
+
+Apply report is written to `{inventory}/apply_report.json`.
 
 ### Apply order
 

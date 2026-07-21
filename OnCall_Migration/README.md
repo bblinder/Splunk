@@ -50,6 +50,8 @@ Follow these steps in order to migrate your configuration:
 6. **Apply**: Execute the migration to the target organization.
    `python3 apply.py --apply`
 
+Optional `apply.py` flags: `--inventory` (default `inventory`), `--remapping` (default `inventory/remapping.json`). See the Migration Guide for details.
+
 **uv:** Prefix commands with `uv run`. Without a venv: `uv run --with requests python3 <script>.py`.
 
 ## Safety & Important Notes
@@ -70,8 +72,9 @@ The following are excluded from the automated run and may require manual handlin
 - **Manual:** Team admins (no public POST API).
 
 ### Documentation
-- **Migration Guide**: [`docs/MIGRATION_GUIDE.md`](docs/MIGRATION_GUIDE.md) (Schema, API notes, checklists)
+- **Migration Guide**: [`docs/MIGRATION_GUIDE.md`](docs/MIGRATION_GUIDE.md) (Schema, API notes, checklists, repository layout)
 - **Validation Template**: [`docs/VALIDATION_REPORT.md`](docs/VALIDATION_REPORT.md) (Template for recording results)
+- **Support modules**: `utils.py`, `summary_reporter.py`, `exceptions.py`, `migration_types.py`
 
 ## Tests
 ```bash
