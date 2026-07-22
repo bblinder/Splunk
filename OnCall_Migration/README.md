@@ -23,8 +23,6 @@ OnCall_Migration/
 ├── docs/
 │   ├── MIGRATION_GUIDE.md
 │   ├── VALIDATION_REPORT.md
-│   ├── HANDOFF_PROMPT.MD
-│   └── SABRE_STAKEHOLDER_QUESTIONS.md
 ├── tests/
 │   ├── test_discovery.py
 │   ├── test_apply.py
