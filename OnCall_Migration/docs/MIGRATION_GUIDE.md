@@ -168,7 +168,7 @@ Integrations are skipped — no public list endpoint exists.
 Limit discovery to specific teams by **slug** (API identifier, not display name):
 
 ```bash
-python3 discovery.py --teams sabre-team-a,sabre-team-b,sabre-team-c
+python3 discovery.py --teams team-1234,team-5678,team-9012
 python3 discovery.py --teams-file inventory/team_scope.txt
 ```
 

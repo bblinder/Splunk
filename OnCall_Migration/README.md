@@ -84,7 +84,7 @@ TARGET_SPLUNK_ONCALL_ORG_SLUG=...
 Follow these steps in order to migrate your Splunk On-Call configuration:
 
 1. **Discovery**: Extract the source organization state.
-   `python3 discovery.py` (Expected duration: ~30–40 min for large orgs). For partial exports, pass team **slugs**: `python3 discovery.py --teams sabre-a,sabre-b,sabre-c` or `--teams-file inventory/team_scope.txt`.
+   `python3 discovery.py` (Expected duration: ~30–40 min for large orgs). For partial exports, pass team **slugs**: `python3 discovery.py --teams team-1234,team-5678,team-9012` or `--teams-file inventory/team_scope.txt`.
 2. **Validation**: Verify consistency of the discovered inventory.
    `python3 validate_inventory.py`
 3. **Remapping**: Generate a template for mapping source IDs to target names/slugs.

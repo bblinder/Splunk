@@ -7,7 +7,7 @@ Usage:
     python3 discovery.py
     python3 discovery.py -h
     python3 discovery.py --inventory inventory
-    python3 discovery.py --teams sabre-a,sabre-b,sabre-c
+    python3 discovery.py --teams team-1234,team-5678,team-9012
     python3 discovery.py --teams-file inventory/team_scope.txt
 
     # uv (with project .venv):
