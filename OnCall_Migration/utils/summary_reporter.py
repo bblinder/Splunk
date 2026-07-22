@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
+from utils.io import load_json
 from utils.migration_types import InventoryCounts
 
 log = logging.getLogger(__name__)
@@ -182,10 +182,7 @@ class SummaryReporter:
         log.info("  -> Saved inventory summary to inventory_summary.md")
 
     def _load_inventory_json(self, name: str) -> Any:
-        path = self.output_dir / f"{name}.json"
-        if not path.exists():
-            return None
-        return json.loads(path.read_text())
+        return load_json(self.output_dir / f"{name}.json")
 
     def _format_duration(self, elapsed_seconds: float) -> str:
         minutes, seconds = divmod(int(elapsed_seconds), 60)

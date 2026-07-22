@@ -9,11 +9,13 @@ Usage:
 """
 
 import argparse
-import json
 import logging
 import sys
 from pathlib import Path
 from typing import Any
+
+from utils.cli import print_help_and_exit_if_requested
+from utils.io import load_json
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 log = logging.getLogger(__name__)
@@ -28,8 +30,8 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
-if __name__ == "__main__" and any(flag in sys.argv for flag in ("-h", "--help")):
-    _build_arg_parser().parse_args()
+if __name__ == "__main__":
+    print_help_and_exit_if_requested(_build_arg_parser)
 
 
 TEAM_SCOPED_FILES = (
@@ -49,11 +51,7 @@ class InventoryValidator:
         self.warnings = 0
 
     def _load_json(self, name: str) -> Any:
-        path = self.inventory_dir / f"{name}.json"
-        if not path.exists():
-            return None
-        with path.open("r") as f:
-            return json.load(f)
+        return load_json(self.inventory_dir / f"{name}.json")
 
     def _count_items(self, name: str, data: Any) -> int:
         if data is None:

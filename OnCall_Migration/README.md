@@ -16,6 +16,9 @@ OnCall_Migration/
 ├── apply.py                      # steps 5–6 (dry-run / --apply)
 ├── utils/
 │   ├── env_loader.py
+│   ├── io.py
+│   ├── cli.py
+│   ├── http_client.py
 │   ├── rate_limiter.py
 │   ├── exceptions.py
 │   ├── migration_types.py
@@ -23,7 +26,7 @@ OnCall_Migration/
 │   └── team_scope.py
 ├── docs/
 │   ├── MIGRATION_GUIDE.md
-│   ├── VALIDATION_REPORT.md
+│   └── VALIDATION_REPORT.md
 ├── tests/
 │   ├── test_discovery.py
 │   ├── test_apply.py
@@ -44,12 +47,12 @@ OnCall_Migration/
 └── discovery_run.log             # gitignored — discovery HTTP log
 ```
 
-Paths marked **gitignored** (`inventory/`, `.env`, `discovery_run.log`, filled `manual_capture/integrations/*.json`) are local operator artifacts; back them up before source org access ends. **Do not commit secrets** in those paths.
+Paths marked **gitignored** (`inventory/`, `.env`, `discovery_run.log`, filled `manual_capture/integrations/*.json`) are local user artifacts. Back them up in case source org access ends. **Do not commit secrets** in those paths.
 
 ## Quick Start
 
 ### Installation
-You can install dependencies using either standard `venv` or `uv`:
+You can install dependencies using either standard `venv` or [`uv`](https://docs.astral.sh/uv/).
 
 ```bash
 # Option A: venv + pip
@@ -121,7 +124,7 @@ The following are excluded from the automated run and may require manual handlin
 ### Documentation
 - **Migration Guide**: [`docs/MIGRATION_GUIDE.md`](docs/MIGRATION_GUIDE.md) (Schema, API notes, checklists, repository layout)
 - **Validation Template**: [`docs/VALIDATION_REPORT.md`](docs/VALIDATION_REPORT.md) (Template for recording results)
-- **Support modules**: [`utils/`](utils/) — `env_loader`, `rate_limiter`, `exceptions`, `migration_types`, `summary_reporter`, `team_scope`
+- **Support modules**: [`utils/`](utils/) — `env_loader`, `io`, `cli`, `http_client`, `rate_limiter`, `exceptions`, `migration_types`, `summary_reporter`, `team_scope`
 
 ## Tests
 ```bash

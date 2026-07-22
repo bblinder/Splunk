@@ -11,9 +11,11 @@ Usage:
 import argparse
 import json
 import logging
-import sys
 from pathlib import Path
 from typing import Any, Dict
+
+from utils.cli import print_help_and_exit_if_requested
+from utils.io import load_json
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S")
 log = logging.getLogger(__name__)
@@ -29,8 +31,8 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
-if __name__ == "__main__" and any(flag in sys.argv for flag in ("-h", "--help")):
-    _build_arg_parser().parse_args()
+if __name__ == "__main__":
+    print_help_and_exit_if_requested(_build_arg_parser)
 
 
 class RemappingGenerator:
@@ -41,16 +43,7 @@ class RemappingGenerator:
         self.output_file = output_file
 
     def _load_json(self, filename: str) -> Any:
-        path = self.inventory_dir / filename
-        if not path.exists():
-            log.warning(f"File not found: {path}")
-            return []
-        try:
-            with path.open("r") as f:
-                return json.load(f)
-        except json.JSONDecodeError:
-            log.error(f"Failed to parse {path}")
-            return []
+        return load_json(self.inventory_dir / filename, default=[], logger=log)
 
     def _collect_emails(self, users: Any, policy_details: Any) -> Dict[str, str]:
         emails: Dict[str, str] = {}

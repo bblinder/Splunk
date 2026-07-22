@@ -24,6 +24,9 @@ Next steps: validate_inventory.py, generate_remapping.py, validate_apply.py, app
 import argparse
 import sys
 
+from utils.cli import print_help_and_exit_if_requested
+
+
 def _build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Export discoverable Splunk On-Call config from the source org to JSON.",
@@ -42,8 +45,8 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
-if __name__ == "__main__" and any(flag in sys.argv for flag in ("-h", "--help")):
-    _build_arg_parser().parse_args()
+if __name__ == "__main__":
+    print_help_and_exit_if_requested(_build_arg_parser)
 
 import itertools
 import json
@@ -56,14 +59,12 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 import requests
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
 
 from utils.env_loader import PROJECT_ROOT, load_dotenv
 from utils.exceptions import ApiError, NetworkError
+from utils.http_client import BaseVictorOpsClient
 from utils.summary_reporter import SummaryReporter
 from utils.migration_types import InventoryCounts
-from utils.rate_limiter import RateLimiter
 from utils.team_scope import (
     collect_usernames,
     expand_policy_closure,
@@ -86,28 +87,21 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 log = logging.getLogger(__name__)
 
 
-class VictorOpsClient:
+class VictorOpsClient(BaseVictorOpsClient):
     """Encapsulates API session, base URLs, rate limiting, and generic fetching."""
     def __init__(self, api_id: str, api_key: str, org_slug: str):
-        self.api_id = api_id
-        self.api_key = api_key
-        self.org_slug = org_slug
-        self.base_v1 = "https://api.victorops.com/api-public/v1"
-        self.base_v2 = "https://api.victorops.com/api-public/v2"
-
-        self.session = requests.Session()
-        retries = Retry(total=6, backoff_factor=2, status_forcelist=[429, 500, 502, 503, 504], allowed_methods=["GET"])
-        self.session.mount("https://", HTTPAdapter(max_retries=retries))
-        self.session.headers.update({
-            "X-VO-Api-Id": self.api_id,
-            "X-VO-Api-Key": self.api_key,
-            "Accept": "application/json",
-        })
-        self.rate_limiter = RateLimiter(rate_hz=2.0) # max 2 req/sec
+        super().__init__(
+            api_id,
+            api_key,
+            org_slug,
+            retry_total=6,
+            retry_backoff=2,
+            allowed_methods=["GET"],
+        )
 
     def get(self, endpoint: str, params: Optional[Dict] = None, use_v2: bool = False, paginate: bool = True, required: bool = False) -> Any:
         base_url = self.base_v2 if use_v2 else self.base_v1
-        url = endpoint if endpoint.startswith("http") else f"{base_url}/{endpoint.lstrip('/')}"
+        url = self._url(endpoint, base_url)
 
         merged = []
         is_list_response = False
@@ -139,7 +133,8 @@ class VictorOpsClient:
             data = resp.json()
 
             if isinstance(data, list):
-                if not paginate: return data
+                if not paginate:
+                    return data
                 is_list_response = True
                 merged.extend(data)
                 break
@@ -161,7 +156,7 @@ class VictorOpsClient:
 
                     next_url = data.get("nextPage") or data.get("next_page") or data.get("next")
                     if next_url:
-                        url = next_url if next_url.startswith("http") else f"{base_url}/{next_url.lstrip('/')}"
+                        url = self._url(next_url, base_url)
                         current_params = {}
                         continue
 
@@ -210,7 +205,8 @@ class DiscoveryPipeline:
             log.info(f"  -> Saved to {path.name}")
 
     def extract_list(self, data: Any, key: str = "") -> List[Any]:
-        if data is None: return []
+        if data is None:
+            return []
         if isinstance(data, list):
             if data and isinstance(data[0], list):
                 return list(itertools.chain.from_iterable(data))
@@ -220,7 +216,8 @@ class DiscoveryPipeline:
         return []
 
     def parse_timestamp(self, ts: str) -> Optional[datetime]:
-        if not ts: return None
+        if not ts:
+            return None
         try:
             return datetime.fromisoformat(ts.replace("Z", "+00:00"))
         except ValueError:
@@ -229,7 +226,8 @@ class DiscoveryPipeline:
 
     def is_override_active(self, override: Dict, now: datetime) -> bool:
         end_ts = override.get("end")
-        if not end_ts: return True
+        if not end_ts:
+            return True
         end_dt = self.parse_timestamp(end_ts)
         if not end_dt:
             log.warning(f"Skip Override {override.get('publicId')}: treating invalid end timestamp as inactive.")
@@ -285,8 +283,10 @@ class DiscoveryPipeline:
         total_active = 0
 
         for override in raw_list:
-            if not isinstance(override, dict): continue
-            if not self.is_override_active(override, now): continue
+            if not isinstance(override, dict):
+                continue
+            if not self.is_override_active(override, now):
+                continue
 
             total_active += 1
             teamslugs = [

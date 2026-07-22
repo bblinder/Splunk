@@ -15,6 +15,9 @@ from __future__ import annotations
 import argparse
 import sys
 
+from utils.cli import print_help_and_exit_if_requested
+
+
 def _build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Apply Splunk On-Call inventory to target org.",
@@ -26,8 +29,8 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
-if __name__ == "__main__" and any(flag in sys.argv for flag in ("-h", "--help")):
-    _build_arg_parser().parse_args()
+if __name__ == "__main__":
+    print_help_and_exit_if_requested(_build_arg_parser)
 
 import json
 import logging
@@ -36,12 +39,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
-import requests
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
-
 from utils.env_loader import PROJECT_ROOT, load_dotenv
-from utils.rate_limiter import RateLimiter
+from utils.http_client import BaseVictorOpsClient
+from utils.io import load_json
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S")
 log = logging.getLogger(__name__)
@@ -65,26 +65,21 @@ class RemappingContext:
         return source in mappings and mappings[source] is None
 
 
-class ApplyClient:
+class ApplyClient(BaseVictorOpsClient):
     def __init__(self, api_id: str, api_key: str, org_slug: str, dry_run: bool = True):
-        self.org_slug = org_slug
-        self.dry_run = dry_run
-        self.base_v1 = "https://api.victorops.com/api-public/v1"
-        self.session = requests.Session()
-        retries = Retry(total=3, backoff_factor=1, status_forcelist=[429, 500, 502, 503, 504], allowed_methods=["GET", "POST"])
-        self.session.mount("https://", HTTPAdapter(max_retries=retries))
-        self.session.headers.update(
-            {
-                "X-VO-Api-Id": api_id,
-                "X-VO-Api-Key": api_key,
-                "Accept": "application/json",
-                "Content-Type": "application/json",
-            }
+        super().__init__(
+            api_id,
+            api_key,
+            org_slug,
+            retry_total=3,
+            retry_backoff=1,
+            allowed_methods=["GET", "POST"],
+            extra_headers={"Content-Type": "application/json"},
         )
-        self.rate_limiter = RateLimiter()
+        self.dry_run = dry_run
 
     def get(self, endpoint: str, allow_404: bool = False) -> Tuple[Optional[Any], int]:
-        url = f"{self.base_v1}/{endpoint.lstrip('/')}"
+        url = self._url(endpoint, self.base_v1)
         self.rate_limiter.wait()
         if self.dry_run and not allow_404:
             log.debug(f"DRY-RUN GET {url}")
@@ -97,7 +92,7 @@ class ApplyClient:
         return resp.json(), resp.status_code
 
     def post(self, endpoint: str, payload: Dict[str, Any]) -> Tuple[Optional[Any], int]:
-        url = f"{self.base_v1}/{endpoint.lstrip('/')}"
+        url = self._url(endpoint, self.base_v1)
         self.rate_limiter.wait()
         if self.dry_run:
             log.info(f"DRY-RUN POST {url}")
@@ -132,10 +127,7 @@ class ApplyPipeline:
         self.stats: Dict[str, Dict[str, int]] = {}
 
     def _load_json(self, name: str) -> Any:
-        path = self.inventory_dir / f"{name}.json"
-        if not path.exists():
-            return None
-        return json.loads(path.read_text())
+        return load_json(self.inventory_dir / f"{name}.json")
 
     def _bump(self, step: str, outcome: str) -> None:
         self.stats.setdefault(step, {"created": 0, "skipped": 0, "failed": 0, "warned": 0})

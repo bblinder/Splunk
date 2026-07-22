@@ -62,6 +62,9 @@ OnCall_Migration/
 ├── apply.py                      # steps 5–6 (dry-run / --apply)
 ├── utils/
 │   ├── env_loader.py
+│   ├── io.py
+│   ├── cli.py
+│   ├── http_client.py
 │   ├── rate_limiter.py
 │   ├── exceptions.py
 │   ├── migration_types.py
@@ -69,8 +72,7 @@ OnCall_Migration/
 │   └── team_scope.py
 ├── docs/
 │   ├── MIGRATION_GUIDE.md
-│   ├── VALIDATION_REPORT.md
-│   └── SABRE_STAKEHOLDER_QUESTIONS.md
+│   └── VALIDATION_REPORT.md
 ├── tests/
 │   ├── test_discovery.py
 │   ├── test_apply.py
@@ -99,6 +101,9 @@ OnCall_Migration/
 | `validate_apply.py` | Pre-flight remapping + relational integrity checks |
 | `apply.py` | Target-org provisioning (dry-run default; `--apply` to write) |
 | `utils/env_loader.py` | Project-root `.env` loading (shared by `discovery.py` and `apply.py`) |
+| `utils/io.py` | Shared `load_json()` for inventory/remapping reads |
+| `utils/cli.py` | `-h`/`--help` guard before heavy imports |
+| `utils/http_client.py` | `BaseVictorOpsClient` — shared session, auth, retries, rate limit |
 | `utils/rate_limiter.py` | Shared `RateLimiter` (VictorOps API throttle) |
 | `utils/summary_reporter.py` | Markdown `inventory_summary.md` generation from on-disk JSON |
 | `utils/exceptions.py` | `MigrationError`, `NetworkError`, `ApiError` |
