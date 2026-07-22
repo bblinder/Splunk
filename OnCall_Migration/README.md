@@ -19,7 +19,8 @@ OnCall_Migration/
 │   ├── rate_limiter.py
 │   ├── exceptions.py
 │   ├── migration_types.py
-│   └── summary_reporter.py
+│   ├── summary_reporter.py
+│   └── team_scope.py
 ├── docs/
 │   ├── MIGRATION_GUIDE.md
 │   ├── VALIDATION_REPORT.md
@@ -79,7 +80,7 @@ TARGET_SPLUNK_ONCALL_ORG_SLUG=...
 Follow these steps in order to migrate your Splunk On-Call configuration:
 
 1. **Discovery**: Extract the source organization state.
-   `python3 discovery.py` (Expected duration: ~30–40 min for large orgs)
+   `python3 discovery.py` (Expected duration: ~30–40 min for large orgs). For partial exports, pass team **slugs**: `python3 discovery.py --teams sabre-a,sabre-b,sabre-c` or `--teams-file inventory/team_scope.txt`.
 2. **Validation**: Verify consistency of the discovered inventory.
    `python3 validate_inventory.py`
 3. **Remapping**: Generate a template for mapping source IDs to target names/slugs.
@@ -92,7 +93,7 @@ Follow these steps in order to migrate your Splunk On-Call configuration:
 6. **Apply**: Execute the migration to the target organization.
    `python3 apply.py --apply`
 
-Optional path flags: `--inventory` (default `inventory`), `--remapping` (default `inventory/remapping.json`) on `generate_remapping.py`, `validate_apply.py`, and `apply.py`; `--inventory` on `discovery.py` and `validate_inventory.py`. See the Migration Guide CLI reference.
+Optional path flags: `--inventory` (default `inventory`), `--remapping` (default `inventory/remapping.json`) on `generate_remapping.py`, `validate_apply.py`, and `apply.py`; `--inventory` on `discovery.py` and `validate_inventory.py`; `--teams` / `--teams-file` on `discovery.py` for scoped exports. See the Migration Guide CLI reference.
 
 All pipeline scripts accept `-h` / `--help` for flags and defaults. See [`docs/MIGRATION_GUIDE.md`](docs/MIGRATION_GUIDE.md) for more detailed information on CLI/flags options.
 
@@ -119,7 +120,7 @@ The following are excluded from the automated run and may require manual handlin
 ### Documentation
 - **Migration Guide**: [`docs/MIGRATION_GUIDE.md`](docs/MIGRATION_GUIDE.md) (Schema, API notes, checklists, repository layout)
 - **Validation Template**: [`docs/VALIDATION_REPORT.md`](docs/VALIDATION_REPORT.md) (Template for recording results)
-- **Support modules**: [`utils/`](utils/) — `env_loader`, `rate_limiter`, `exceptions`, `migration_types`, `summary_reporter`
+- **Support modules**: [`utils/`](utils/) — `env_loader`, `rate_limiter`, `exceptions`, `migration_types`, `summary_reporter`, `team_scope`
 
 ## Tests
 ```bash

@@ -162,6 +162,125 @@ class DiscoveryPipelineTest(unittest.TestCase):
         )
         self.assertEqual(results["team-a"], {"rotations": [{"name": "primary"}]})
 
+    def test_run_scoped_saves_filtered_inventory_and_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp)
+            pipeline = DiscoveryPipeline(
+                self.client,
+                output_dir,
+                requested_team_slugs=["team-a"],
+            )
+
+            all_users = [
+                {"username": "alice", "email": "alice@example.com"},
+                {"username": "bob", "email": "bob@example.com"},
+            ]
+            all_teams = [
+                {"slug": "team-a", "name": "Team A"},
+                {"slug": "team-b", "name": "Team B"},
+            ]
+            policies_list = [
+                {
+                    "policy": {"slug": "pol-a", "name": "Policy A"},
+                    "team": {"slug": "team-a"},
+                },
+                {
+                    "policy": {"slug": "pol-b", "name": "Policy B"},
+                    "team": {"slug": "team-b"},
+                },
+            ]
+
+            def fake_get(endpoint, params=None, use_v2=False, paginate=True, required=False):
+                if endpoint == "user":
+                    return {"users": all_users}
+                if endpoint == "team":
+                    return {"teams": all_teams}
+                if endpoint == "org/routing-keys":
+                    return {
+                        "routingKeys": [
+                            {
+                                "routingKey": "ALPHA",
+                                "targets": [{"policySlug": "pol-a"}],
+                            },
+                            {
+                                "routingKey": "BETA",
+                                "targets": [{"policySlug": "pol-b"}],
+                            },
+                        ]
+                    }
+                if endpoint == "alertRules":
+                    return {
+                        "rules": [
+                            {
+                                "id": 1,
+                                "alertField": "routing_key",
+                                "alertValueMatch": "ALPHA",
+                                "rank": 1,
+                            },
+                            {
+                                "id": 2,
+                                "alertField": "message_type",
+                                "alertValueMatch": "noop",
+                                "rank": 2,
+                            },
+                        ]
+                    }
+                if endpoint == "policies":
+                    return {"policies": policies_list}
+                if endpoint == "overrides":
+                    return {"overrides": []}
+                if endpoint == "team/team-a/members":
+                    return {"members": [{"username": "alice"}]}
+                if endpoint == "team/team-a/admins":
+                    return {"admins": [{"username": "alice"}]}
+                if endpoint == "team/team-a/rotations":
+                    return {"rotations": []}
+                if endpoint == "team/team-a/oncall/schedule":
+                    return {"schedule": []}
+                if endpoint == "user/alice/contact-methods":
+                    return {"devices": [], "emails": [], "phones": []}
+                if endpoint == "user/alice/policies":
+                    return {"policies": []}
+                if endpoint == "policies/pol-a":
+                    return [
+                        {
+                            "timeout": 0,
+                            "entries": [
+                                {
+                                    "executionType": "user",
+                                    "user": {"username": "alice"},
+                                }
+                            ],
+                        }
+                    ]
+                return None
+
+            self.client.get = mock.MagicMock(side_effect=fake_get)
+
+            with mock.patch.object(self.client.rate_limiter, "wait"):
+                pipeline.run()
+
+            users = json.loads((output_dir / "users_inventory.json").read_text())
+            teams = json.loads((output_dir / "teams_inventory.json").read_text())
+            routing_keys = json.loads((output_dir / "routing_keys_inventory.json").read_text())
+            metadata = json.loads((output_dir / "discovery_metadata.json").read_text())
+
+            self.assertEqual(len(users), 1)
+            self.assertEqual(users[0]["username"], "alice")
+            self.assertEqual({team["slug"] for team in teams}, {"team-a"})
+            self.assertEqual(len(routing_keys), 1)
+            self.assertEqual(routing_keys[0]["routingKey"], "ALPHA")
+            self.assertEqual(metadata["scope"]["teams"], ["team-a"])
+            self.assertIn("pol-a", metadata["scope"]["expanded_policies"])
+
+            member_calls = [
+                call.args[0]
+                for call in self.client.get.call_args_list
+                if call.args and call.args[0].startswith("team/")
+            ]
+            self.assertTrue(all("team-b" not in endpoint for endpoint in member_calls))
+            self.assertFalse(any(call.args[0] == "user/bob/contact-methods" for call in self.client.get.call_args_list))
+
 
 if __name__ == "__main__":
     unittest.main()

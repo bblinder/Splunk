@@ -7,6 +7,8 @@ Usage:
     python3 discovery.py
     python3 discovery.py -h
     python3 discovery.py --inventory inventory
+    python3 discovery.py --teams sabre-a,sabre-b,sabre-c
+    python3 discovery.py --teams-file inventory/team_scope.txt
 
     # uv (with project .venv):
     uv run python3 discovery.py
@@ -28,6 +30,15 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument("--inventory", default="inventory", help="Output directory for inventory JSON.")
+    team_group = parser.add_mutually_exclusive_group()
+    team_group.add_argument(
+        "--teams",
+        help="Comma-separated team slugs to export (not display names).",
+    )
+    team_group.add_argument(
+        "--teams-file",
+        help="Path to file with one team slug per line (# comments allowed).",
+    )
     return parser
 
 
@@ -42,7 +53,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -53,6 +64,23 @@ from utils.exceptions import ApiError, NetworkError
 from utils.summary_reporter import SummaryReporter
 from utils.migration_types import InventoryCounts
 from utils.rate_limiter import RateLimiter
+from utils.team_scope import (
+    collect_usernames,
+    expand_policy_closure,
+    filter_alert_rules,
+    filter_overrides,
+    filter_policy_details,
+    filter_routing_keys,
+    filter_teams,
+    filter_users,
+    group_policies_by_team,
+    parse_teams_arg,
+    parse_teams_file,
+    routing_key_names,
+    seed_policy_slugs,
+    team_slugs_for_policies,
+    unknown_team_slugs,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S")
 log = logging.getLogger(__name__)
@@ -156,11 +184,14 @@ class DiscoveryPipeline:
         client: VictorOpsClient,
         output_dir: Path,
         reporter: Optional[SummaryReporter] = None,
+        requested_team_slugs: Optional[List[str]] = None,
     ):
         self.client = client
         self.output_dir = output_dir
         self.inventory_counts: InventoryCounts = {}
         self.reporter = reporter or SummaryReporter(output_dir, client.org_slug, self.inventory_counts)
+        self.requested_team_slugs = requested_team_slugs
+        self.scope_metadata: Optional[Dict[str, Any]] = None
 
     def save_json(self, name: str, data: Any):
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -276,17 +307,197 @@ class DiscoveryPipeline:
         log.info("=" * 60)
         log.info(f"Splunk On-Call Discovery | Org: {self.client.org_slug}")
         log.info(f"Output directory: {self.output_dir.resolve()}")
+        if self.requested_team_slugs:
+            log.info(f"Team scope: {', '.join(self.requested_team_slugs)}")
         log.info("=" * 60)
 
-        users, teams = self._process_global_entities()
-        self._process_user_scoped_entities(users)
-        policies_list = self._process_team_scoped_entities(teams)
-        if policies_list is not None:
-            self._process_policy_details(policies_list)
+        if self.requested_team_slugs:
+            self._run_scoped()
+        else:
+            users, teams = self._process_global_entities()
+            self._process_user_scoped_entities(users)
+            policies_list = self._process_team_scoped_entities(teams)
+            if policies_list is not None:
+                self._process_policy_details(policies_list)
 
         elapsed = time.monotonic() - start_time
         self._finalize_run(elapsed)
         return self.inventory_counts
+
+    def _fetch_team_members(self, teams: List[Any]) -> Dict[str, Any]:
+        log.info("Fetching Team Members...")
+        return self.fetch_per_entity_concurrent(
+            teams, "slug", lambda t: f"team/{t}/members", "team"
+        )
+
+    def _fetch_team_admins(self, teams: List[Any]) -> Dict[str, Any]:
+        log.info("Fetching Team Admins...")
+        return self.fetch_per_entity_concurrent(
+            teams, "slug", lambda t: f"team/{t}/admins", "team"
+        )
+
+    def _fetch_rotations(self, teams: List[Any]) -> Dict[str, Any]:
+        log.info("Fetching Team Rotation Definitions...")
+        return self.fetch_per_entity_concurrent(
+            teams,
+            "slug",
+            lambda t: f"team/{t}/rotations",
+            "team",
+            use_v2=True,
+            paginate=False,
+        )
+
+    def _fetch_schedules(self, teams: List[Any]) -> Dict[str, Any]:
+        log.info("Fetching On-Call Schedules v2...")
+        return self.fetch_per_entity_concurrent(
+            teams, "slug", lambda t: f"team/{t}/oncall/schedule", "team", use_v2=True
+        )
+
+    def _fetch_policies_list(self) -> List[Any]:
+        log.info("Fetching Escalation Policies summaries...")
+        policies_raw = self.client.get("policies", required=True)
+        return self.extract_list(policies_raw, "policies")
+
+    def _fetch_policy_details(self, policy_slugs: Set[str]) -> Dict[str, Any]:
+        if not policy_slugs:
+            return {}
+        slugs_sorted = sorted(policy_slugs)
+        log.info(f"Fetching {len(slugs_sorted)} policy details...")
+        return self.fetch_per_entity_concurrent(
+            [{"slug": slug} for slug in slugs_sorted],
+            "slug",
+            lambda slug: f"policies/{slug}",
+            "policy",
+        )
+
+    def _fetch_user_contact_methods(self, users: List[Any]) -> Dict[str, Any]:
+        log.info("Fetching User Contact Methods...")
+        return self.fetch_per_entity_concurrent(
+            users, "username", lambda u: f"user/{u}/contact-methods", "user"
+        )
+
+    def _fetch_user_paging_policies(self, users: List[Any]) -> Dict[str, Any]:
+        log.info("Fetching User Paging Policies...")
+        return self.fetch_per_entity_concurrent(
+            users, "username", lambda u: f"user/{u}/policies", "user"
+        )
+
+    def _run_scoped(self) -> None:
+        requested = self.requested_team_slugs or []
+        requested_set = set(requested)
+
+        log.info("[Phase 1/4] Fetching global entities...")
+        all_users = self.extract_list(self.client.get("user", required=True), "users")
+        all_teams = self.extract_list(self.client.get("team", required=True), "teams")
+        all_routing_keys = self.extract_list(
+            self.client.get("org/routing-keys", required=True), "routingKeys"
+        )
+        all_rules = self.extract_list(self.client.get("alertRules", required=True), "rules")
+        policies_list = self._fetch_policies_list()
+
+        unknown = unknown_team_slugs(requested, all_teams)
+        if unknown:
+            log.critical(f"Unknown team slug(s): {', '.join(unknown)}")
+            sys.exit(1)
+
+        team_slugs = set(requested_set)
+        teams_for_fetch = filter_teams(all_teams, team_slugs)
+
+        log.info(f"\n[Phase 3/4] Fetching team-scoped entities ({len(teams_for_fetch)} teams)...")
+        team_members = self._fetch_team_members(teams_for_fetch)
+        team_admins = self._fetch_team_admins(teams_for_fetch)
+        rotations = self._fetch_rotations(teams_for_fetch)
+
+        seed_slugs = seed_policy_slugs(policies_list, team_slugs)
+        policy_details = self._fetch_policy_details(seed_slugs)
+        expanded_policies = expand_policy_closure(policy_details, seed_slugs)
+
+        missing_details = expanded_policies - set(policy_details.keys())
+        if missing_details:
+            policy_details.update(self._fetch_policy_details(missing_details))
+            expanded_policies = expand_policy_closure(policy_details, seed_slugs)
+
+        expanded_teams = team_slugs_for_policies(policies_list, expanded_policies)
+        added_teams = expanded_teams - team_slugs
+        if added_teams:
+            log.info(f"Policy closure added team slug(s): {', '.join(sorted(added_teams))}")
+            extra_teams = filter_teams(all_teams, added_teams)
+            team_members.update(self._fetch_team_members(extra_teams))
+            team_admins.update(self._fetch_team_admins(extra_teams))
+            rotations.update(self._fetch_rotations(extra_teams))
+            team_slugs |= added_teams
+
+        teams_for_fetch = filter_teams(all_teams, team_slugs)
+        schedules = self._fetch_schedules(teams_for_fetch)
+        overrides = filter_overrides(self.get_scheduled_overrides(), team_slugs)
+
+        usernames = collect_usernames(team_members, rotations, team_slugs)
+        users = filter_users(all_users, usernames)
+        log.info(f"Scoped user set: {len(users)} user(s) from {len(team_slugs)} team(s)")
+
+        filtered_routing_keys = filter_routing_keys(all_routing_keys, expanded_policies)
+        filtered_rules = filter_alert_rules(all_rules, routing_key_names(filtered_routing_keys))
+
+        grouped_policies = group_policies_by_team(policies_list, team_slugs, expanded_policies)
+        policy_details = filter_policy_details(policy_details, expanded_policies)
+        teams = filter_teams(all_teams, team_slugs)
+
+        log.info(f"\n[Phase 2/4] Fetching user-scoped entities ({len(users)} users)...")
+        if users:
+            contact_methods = self._fetch_user_contact_methods(users)
+            paging_policies = self._fetch_user_paging_policies(users)
+        else:
+            log.warning("[Phase 2/4] No users in scope — skipping user-scoped entities.")
+            contact_methods = {}
+            paging_policies = {}
+
+        log.info("\n[Phase 4/4] Scoped export complete — saving filtered inventory...")
+
+        self.save_json("users_inventory", users)
+        self.inventory_counts["users_inventory"] = len(users)
+        self.save_json("teams_inventory", teams)
+        self.inventory_counts["teams_inventory"] = len(teams)
+        self.save_json("routing_keys_inventory", filtered_routing_keys)
+        self.inventory_counts["routing_keys_inventory"] = len(filtered_routing_keys)
+        self.save_json("alert_rules_inventory", filtered_rules)
+        self.inventory_counts["alert_rules_inventory"] = len(filtered_rules)
+        self.save_json("outbound_webhooks_inventory", [])
+        self.inventory_counts["outbound_webhooks_inventory"] = 0
+        self.inventory_counts["integrations_inventory"] = 0
+
+        self.save_json("contact_methods_inventory", contact_methods)
+        self.inventory_counts["contact_methods_inventory"] = len(contact_methods)
+        self.save_json("paging_policies_inventory", paging_policies)
+        self.inventory_counts["paging_policies_inventory"] = len(paging_policies)
+
+        self.save_json("team_members_inventory", team_members)
+        self.inventory_counts["team_members_inventory"] = len(team_members)
+        self.save_json("team_admins_inventory", team_admins)
+        self.inventory_counts["team_admins_inventory"] = len(team_admins)
+        self.save_json("rotation_definitions_inventory", rotations)
+        self.inventory_counts["rotation_definitions_inventory"] = len(rotations)
+        self.save_json("escalation_policies_inventory", grouped_policies)
+        self.inventory_counts["escalation_policies_inventory"] = len(grouped_policies)
+        self.save_json("schedules_inventory", schedules)
+        self.inventory_counts["schedules_inventory"] = len(schedules)
+        self.save_json("scheduled_overrides_inventory", overrides)
+        self.inventory_counts["scheduled_overrides_inventory"] = len(overrides)
+        self.save_json("escalation_policy_details_inventory", policy_details)
+        self.inventory_counts["escalation_policy_details_inventory"] = len(policy_details)
+
+        self.scope_metadata = {
+            "mode": "teams",
+            "teams": sorted(requested_set),
+            "expanded_teams": sorted(team_slugs),
+            "expanded_policies": sorted(expanded_policies),
+        }
+        log.info(
+            "Scope summary: %d requested team(s), %d expanded team(s), %d policy slug(s), %d user(s).",
+            len(requested_set),
+            len(team_slugs),
+            len(expanded_policies),
+            len(users),
+        )
 
     def _process_global_entities(self) -> Tuple[List[Any], List[Any]]:
         log.info("[Phase 1/4] Fetching global entities...")
@@ -320,17 +531,11 @@ class DiscoveryPipeline:
     def _process_user_scoped_entities(self, users: List[Any]) -> None:
         if users:
             log.info(f"\n[Phase 2/4] Fetching user-scoped entities ({len(users)} users)...")
-            log.info("Fetching User Contact Methods...")
-            contact_methods = self.fetch_per_entity_concurrent(
-                users, "username", lambda u: f"user/{u}/contact-methods", "user"
-            )
+            contact_methods = self._fetch_user_contact_methods(users)
             self.save_json("contact_methods_inventory", contact_methods)
             self.inventory_counts["contact_methods_inventory"] = len(contact_methods)
 
-            log.info("Fetching User Paging Policies...")
-            paging_policies = self.fetch_per_entity_concurrent(
-                users, "username", lambda u: f"user/{u}/policies", "user"
-            )
+            paging_policies = self._fetch_user_paging_policies(users)
             self.save_json("paging_policies_inventory", paging_policies)
             self.inventory_counts["paging_policies_inventory"] = len(paging_policies)
             return
@@ -352,35 +557,19 @@ class DiscoveryPipeline:
             return None
 
         log.info(f"\n[Phase 3/4] Fetching team-scoped entities ({len(teams)} teams)...")
-        log.info("Fetching Team Members...")
-        team_members = self.fetch_per_entity_concurrent(
-            teams, "slug", lambda t: f"team/{t}/members", "team"
-        )
+        team_members = self._fetch_team_members(teams)
         self.save_json("team_members_inventory", team_members)
         self.inventory_counts["team_members_inventory"] = len(team_members)
 
-        log.info("Fetching Team Admins...")
-        team_admins = self.fetch_per_entity_concurrent(
-            teams, "slug", lambda t: f"team/{t}/admins", "team"
-        )
+        team_admins = self._fetch_team_admins(teams)
         self.save_json("team_admins_inventory", team_admins)
         self.inventory_counts["team_admins_inventory"] = len(team_admins)
 
-        log.info("Fetching Team Rotation Definitions...")
-        rotations = self.fetch_per_entity_concurrent(
-            teams,
-            "slug",
-            lambda t: f"team/{t}/rotations",
-            "team",
-            use_v2=True,
-            paginate=False,
-        )
+        rotations = self._fetch_rotations(teams)
         self.save_json("rotation_definitions_inventory", rotations)
         self.inventory_counts["rotation_definitions_inventory"] = len(rotations)
 
-        log.info("Fetching Escalation Policies summaries...")
-        policies_raw = self.client.get("policies", required=True)
-        policies_list = self.extract_list(policies_raw, "policies")
+        policies_list = self._fetch_policies_list()
 
         grouped_policies = {}
         for policy in policies_list:
@@ -391,10 +580,7 @@ class DiscoveryPipeline:
         self.save_json("escalation_policies_inventory", grouped_policies)
         self.inventory_counts["escalation_policies_inventory"] = len(grouped_policies)
 
-        log.info("Fetching On-Call Schedules v2...")
-        schedules = self.fetch_per_entity_concurrent(
-            teams, "slug", lambda t: f"team/{t}/oncall/schedule", "team", use_v2=True
-        )
+        schedules = self._fetch_schedules(teams)
         self.save_json("schedules_inventory", schedules)
         self.inventory_counts["schedules_inventory"] = len(schedules)
 
@@ -410,12 +596,7 @@ class DiscoveryPipeline:
             for policy in policies_list
             if policy.get("policy", {}).get("slug")
         }
-        policy_slugs = sorted(unique_slugs)
-
-        log.info(f"Fetching {len(policy_slugs)} unique policy details...")
-        policy_details = self.fetch_per_entity_concurrent(
-            [{"slug": slug} for slug in policy_slugs], "slug", lambda slug: f"policies/{slug}", "policy"
-        )
+        policy_details = self._fetch_policy_details(unique_slugs)
         self.save_json("escalation_policy_details_inventory", policy_details)
         self.inventory_counts["escalation_policy_details_inventory"] = len(policy_details)
 
@@ -446,8 +627,14 @@ class DiscoveryPipeline:
                     "Not exported — no public Splunk On-Call API endpoint exists for "
                     "listing integrations. See manual_capture/README.md."
                 ),
-            }
+            },
         }
+        if self.scope_metadata:
+            metadata["scope"] = self.scope_metadata
+            metadata["notes"]["scoped_export"] = (
+                "Partial export — alert rules limited to routing_key matches on in-scope "
+                "routing keys; outbound webhooks excluded; policy closure may add teams."
+            )
         self.save_json("discovery_metadata", metadata)
 
 
@@ -468,8 +655,22 @@ def main(argv: Optional[List[str]] = None) -> None:
         log.critical("Missing required environment variables. Set SOURCE_SPLUNK_ONCALL_API_ID, SOURCE_SPLUNK_ONCALL_API_KEY, SOURCE_SPLUNK_ONCALL_ORG_SLUG.")
         sys.exit(1)
 
+    requested_teams: Optional[List[str]] = None
+    if args.teams:
+        requested_teams = parse_teams_arg(args.teams)
+    elif args.teams_file:
+        teams_path = Path(args.teams_file)
+        if not teams_path.exists():
+            log.critical(f"Teams file not found: {teams_path}")
+            sys.exit(1)
+        requested_teams = parse_teams_file(teams_path)
+
+    if requested_teams is not None and not requested_teams:
+        log.critical("No team slugs provided via --teams or --teams-file.")
+        sys.exit(1)
+
     client = VictorOpsClient(api_id, api_key, org_slug)
-    pipeline = DiscoveryPipeline(client, Path(args.inventory))
+    pipeline = DiscoveryPipeline(client, Path(args.inventory), requested_team_slugs=requested_teams)
     pipeline.run()
 
 if __name__ == "__main__":

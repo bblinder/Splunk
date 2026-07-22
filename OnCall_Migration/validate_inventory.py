@@ -71,6 +71,7 @@ class InventoryValidator:
     def validate(self) -> int:
         log.info("Starting inventory validation...")
         self._validate_team_coverage()
+        self._validate_scope_metadata()
         self._validate_metadata_counts()
         self._validate_routing_key_policies()
         log.info("-" * 40)
@@ -104,6 +105,23 @@ class InventoryValidator:
             if extra:
                 self.warnings += 1
                 log.warning(f"{inventory_name}: {len(extra)} key(s) not in teams_inventory.")
+
+    def _validate_scope_metadata(self) -> None:
+        metadata = self._load_json("discovery_metadata")
+        if not metadata or not isinstance(metadata.get("scope"), dict):
+            return
+
+        scope = metadata["scope"]
+        requested = scope.get("teams") or []
+        expanded = scope.get("expanded_teams") or []
+        log.info("Scoped export detected in discovery_metadata.")
+        if set(expanded) - set(requested):
+            added = sorted(set(expanded) - set(requested))
+            self.warnings += 1
+            log.warning(
+                "Policy closure expanded team scope beyond --teams: "
+                + ", ".join(added)
+            )
 
     def _validate_metadata_counts(self) -> None:
         log.info("Checking discovery_metadata counts...")

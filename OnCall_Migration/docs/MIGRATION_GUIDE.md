@@ -22,7 +22,7 @@ Terraform was evaluated and rejected for the apply step: the `splunk/victorops` 
 
 | Step | Action | Command | Output / note |
 | :--- | :--- | :--- | :--- |
-| 1 | Discovery | `python3 discovery.py` | `inventory/*.json`, `inventory_summary.md` (~30–40 min for large orgs) |
+| 1 | Discovery | `python3 discovery.py` | `inventory/*.json`, `inventory_summary.md` (~30–40 min for large orgs). Optional partial export: `--teams` / `--teams-file` — see [Scoped discovery](#scoped-discovery-partial-export) below. |
 | 2 | Validation | `python3 validate_inventory.py` | Exit 0/1 — consistency checks |
 | 3 | Remapping | `python3 generate_remapping.py` | `inventory/remapping.json` — edit manually; set `null` to skip |
 | 4 | Pre-flight | `python3 validate_apply.py` | Exit 0/1 — remapping integrity |
@@ -65,11 +65,11 @@ OnCall_Migration/
 │   ├── rate_limiter.py
 │   ├── exceptions.py
 │   ├── migration_types.py
-│   └── summary_reporter.py
+│   ├── summary_reporter.py
+│   └── team_scope.py
 ├── docs/
 │   ├── MIGRATION_GUIDE.md
 │   ├── VALIDATION_REPORT.md
-│   ├── HANDOFF_PROMPT.MD
 │   └── SABRE_STAKEHOLDER_QUESTIONS.md
 ├── tests/
 │   ├── test_discovery.py
@@ -102,6 +102,7 @@ OnCall_Migration/
 | `utils/summary_reporter.py` | Markdown `inventory_summary.md` generation from on-disk JSON |
 | `utils/exceptions.py` | `MigrationError`, `NetworkError`, `ApiError` |
 | `utils/migration_types.py` | Shared type aliases (`InventoryCounts`, etc.) |
+| `utils/team_scope.py` | Scoped discovery filtering (team slugs, policy closure, alert/routing-key subset) |
 | `tests/` | Mocked unit tests (no live API calls) |
 | `docs/` | Migration guide and post-discovery validation template (`VALIDATION_REPORT.md`) |
 | `inventory/` | API export output and `remapping.json` (gitignored) |
@@ -128,7 +129,7 @@ Every pipeline script supports `-h` / `--help` for flags and defaults (e.g. `pyt
 
 | Script | Flags | Default paths |
 | :--- | :--- | :--- |
-| `discovery.py` | `--inventory` | `inventory` |
+| `discovery.py` | `--inventory`, `--teams`, `--teams-file` | `inventory`; scoped: comma-separated team slugs or file |
 | `validate_inventory.py` | `--inventory` | `inventory` |
 | `generate_remapping.py` | `--inventory`, `--remapping` | `inventory`, `inventory/remapping.json` |
 | `validate_apply.py` | `--inventory`, `--remapping` | same |
@@ -155,6 +156,22 @@ python3 -m unittest discover -s tests -t . -v
 | 4/4 Policy details | Per unique policy slug | full escalation steps and entries |
 
 Integrations are skipped — no public list endpoint exists.
+
+### Scoped discovery (partial export)
+
+Limit discovery to specific teams by **slug** (API identifier, not display name):
+
+```bash
+python3 discovery.py --teams sabre-team-a,sabre-team-b,sabre-team-c
+python3 discovery.py --teams-file inventory/team_scope.txt
+```
+
+- Slugs are comma-separated; whitespace is stripped. Shell quotes are optional (`"a,b"`).
+- Unknown slugs fail fast with an error listing invalid values.
+- Scoped export includes: selected teams, members/admins/rotations/schedules/overrides for those teams, users referenced by those teams, escalation policies (with **transitive `policy_routing` closure**), matching routing keys, and alert rules whose `alertField` is `routing_key` and whose match value is an in-scope routing key.
+- **Excluded in scoped mode:** outbound webhooks (empty list), alert rules with non-`routing_key` fields, org data for teams outside scope.
+- Policy closure may add teams not listed in `--teams`; see `discovery_metadata.json` → `scope.expanded_teams`.
+- Full-org discovery is unchanged when `--teams` / `--teams-file` are omitted.
 
 ### Inventory files
 
