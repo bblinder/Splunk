@@ -222,6 +222,11 @@ class ApplyPipeline:
                 self._bump("users", "skipped")
                 continue
             target_username = self.remapping.map_value("users", source_username)
+            source_email = user.get("email") or f"{target_username}@example.com"
+            if self.remapping.is_skipped("emails", source_email):
+                self._bump("users", "skipped")
+                continue
+            target_email = self.remapping.map_value("emails", source_email)
             existing, status = self.client.get(f"user/{target_username}", allow_404=True)
             if status == 200 and existing:
                 log.info(f"  SKIP user exists: {target_username}")
@@ -231,7 +236,7 @@ class ApplyPipeline:
                 "firstName": user.get("firstName", ""),
                 "lastName": user.get("lastName", ""),
                 "username": target_username,
-                "email": user.get("email", f"{target_username}@example.com"),
+                "email": target_email,
             }
             result, code = self.client.post("user", payload)
             if code == 200 and result is not None:
@@ -436,7 +441,12 @@ class ApplyPipeline:
                 return None
             transformed["user"] = {"username": self.remapping.map_value("users", source_user or "")}
         elif execution_type == "email":
-            transformed["email"] = {"address": entry.get("email", {}).get("address", "")}
+            source_address = entry.get("email", {}).get("address", "")
+            if not source_address:
+                return None
+            if self.remapping.is_skipped("emails", source_address):
+                return None
+            transformed["email"] = {"address": self.remapping.map_value("emails", source_address)}
         elif execution_type == "policy_routing":
             target = entry.get("targetPolicy", {})
             source_policy = target.get("policySlug")

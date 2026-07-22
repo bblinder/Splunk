@@ -303,7 +303,9 @@ Use a dry run before any repeat apply and compare `inventory/apply_report.json` 
 
 ### Remapping
 
-`generate_remapping.py` produces six categories: `users`, `teams`, `routing_keys`, `escalation_policies`, `alert_rules`, `outbound_webhooks`. Output defaults to `inventory/remapping.json`. Set any value to `null` to skip that resource. Re-running the generator overwrites the file.
+`generate_remapping.py` produces seven categories: `users`, `emails`, `teams`, `routing_keys`, `escalation_policies`, `alert_rules`, `outbound_webhooks`. Output defaults to `inventory/remapping.json`. Set any value to `null` to skip that resource. Re-running the generator overwrites the file.
+
+**Email addresses:** The `emails` category maps source addresses to target addresses (for example when the target org uses a different email domain). Entries are collected from `users_inventory.json` and escalation-policy email steps in `escalation_policy_details_inventory.json`. Apply uses remapped emails when creating users and when building escalation-policy email steps. Set a source address to `null` to skip user creation for that address and omit matching escalation steps.
 
 **Alert rule routing keys:** The generator populates `routing_keys` only from `routing_keys_inventory.json`. Rules with `alertField: routing_key` may use pattern match values (for example rotation names) that are not listed as org routing keys. `validate_apply.py` fails if a non-skipped rule references a match value missing from `remapping.routing_keys`. Add the match value under `routing_keys` with the desired target name, or set the rule ID to `null` in `alert_rules` to skip it.
 

@@ -69,6 +69,8 @@ class PreFlightValidator:
             return self.errors
 
         self._validate_formats(remapping)
+        self._validate_user_emails(remapping)
+        self._validate_escalation_policy_emails(remapping)
         self._validate_routing_key_policies(remapping)
         self._validate_policy_teams(remapping)
         self._validate_team_members(remapping)
@@ -89,6 +91,7 @@ class PreFlightValidator:
             "teams": re.compile(r"^[a-zA-Z0-9_-]+$"),
             "escalation_policies": re.compile(r"^[a-zA-Z0-9_-]+$"),
             "users": re.compile(r"^[a-zA-Z0-9_.@-]+$"),
+            "emails": re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$"),
             "routing_keys": re.compile(r"^.+$"),
             "alert_rules": re.compile(r"^.+$"),
             "outbound_webhooks": re.compile(r"^[a-zA-Z0-9_-]+$"),
@@ -112,6 +115,76 @@ class PreFlightValidator:
                         )
                     else:
                         log.error(f"[{category}] Invalid format '{target}' for source '{source}'.")
+
+    def _validate_user_emails(self, remapping: Dict[str, Any]) -> None:
+        mapped_emails = remapping.get("emails")
+        if not mapped_emails:
+            return
+
+        log.info("Validating user email references...")
+        users = self._load_json(self.inventory_dir / "users_inventory.json") or []
+        mapped_users = remapping.get("users", {})
+
+        for user in users:
+            if not isinstance(user, dict):
+                continue
+            username = user.get("username")
+            address = user.get("email")
+            if not username or not address or self._is_skipped(mapped_users, username):
+                continue
+            if address not in mapped_emails:
+                self.errors += 1
+                log.error(
+                    f"[users] User '{username}' has email '{address}' "
+                    "which is missing from remapping.json."
+                )
+            elif mapped_emails[address] is None:
+                self.errors += 1
+                log.error(
+                    f"[users] User '{username}' has email '{address}' "
+                    "which is marked to be SKIPPED."
+                )
+
+    def _validate_escalation_policy_emails(self, remapping: Dict[str, Any]) -> None:
+        mapped_emails = remapping.get("emails")
+        if not mapped_emails:
+            return
+
+        log.info("Validating escalation policy email references...")
+        details = self._load_json(self.inventory_dir / "escalation_policy_details_inventory.json") or {}
+        mapped_policies = remapping.get("escalation_policies", {})
+
+        if not isinstance(details, dict):
+            return
+
+        for policy_slug, steps in details.items():
+            if self._is_skipped(mapped_policies, policy_slug):
+                continue
+            if not isinstance(steps, list):
+                continue
+            for step in steps:
+                if not isinstance(step, dict):
+                    continue
+                for entry in step.get("entries", []):
+                    if not isinstance(entry, dict):
+                        continue
+                    if entry.get("executionType") != "email":
+                        continue
+                    address = entry.get("email", {}).get("address")
+                    if not address:
+                        continue
+                    if address not in mapped_emails:
+                        self.errors += 1
+                        log.error(
+                            f"[escalation_policies] Policy '{policy_slug}' uses email '{address}' "
+                            "which is missing from remapping.json."
+                        )
+                    elif mapped_emails[address] is None:
+                        self.errors += 1
+                        log.error(
+                            f"[escalation_policies] Policy '{policy_slug}' uses email '{address}' "
+                            "which is marked to be SKIPPED."
+                        )
 
     def _validate_routing_key_policies(self, remapping: Dict[str, Any]) -> None:
         log.info("Validating routing key targets...")

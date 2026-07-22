@@ -23,11 +23,26 @@ class RemappingGeneratorTest(unittest.TestCase):
 
     def _write_inventory(self) -> None:
         fixtures = {
-            "users_inventory.json": [{"username": "alice", "displayName": "Alice"}],
+            "users_inventory.json": [
+                {"username": "alice", "displayName": "Alice", "email": "alice@example.com"}
+            ],
             "teams_inventory.json": [{"slug": "team-alpha", "name": "Alpha"}],
             "routing_keys_inventory.json": [{"routingKey": "ALPHA"}],
             "escalation_policies_inventory.json": {
                 "team-alpha": [{"policy": {"slug": "pol-alpha", "name": "Alpha"}}]
+            },
+            "escalation_policy_details_inventory.json": {
+                "pol-alpha": [
+                    {
+                        "timeout": 0,
+                        "entries": [
+                            {
+                                "executionType": "email",
+                                "email": {"address": "oncall@example.com"},
+                            }
+                        ],
+                    }
+                ]
             },
             "alert_rules_inventory.json": [{"id": 42, "rank": 1, "alertField": "routing_key"}],
             "outbound_webhooks_inventory.json": [{"slug": "wh-test", "label": "Test"}],
@@ -40,6 +55,8 @@ class RemappingGeneratorTest(unittest.TestCase):
         result = generator.generate()
 
         self.assertEqual(result["users"]["alice"], "alice")
+        self.assertEqual(result["emails"]["alice@example.com"], "alice@example.com")
+        self.assertEqual(result["emails"]["oncall@example.com"], "oncall@example.com")
         self.assertEqual(result["teams"]["team-alpha"], "team-alpha")
         self.assertEqual(result["routing_keys"]["ALPHA"], "ALPHA")
         self.assertEqual(result["escalation_policies"]["pol-alpha"], "pol-alpha")

@@ -33,6 +33,7 @@ class ApplyPipelineTest(unittest.TestCase):
         self.remapping = RemappingContext(
             {
                 "users": {"alice": "alice"},
+                "emails": {"alice@example.com": "alice@target.example.com"},
                 "teams": {"team-alpha": "team-alpha"},
                 "routing_keys": {"ALPHA": "ALPHA"},
                 "escalation_policies": {"pol-alpha": "pol-alpha"},
@@ -178,11 +179,88 @@ class ApplyPipelineTest(unittest.TestCase):
 
         user_post = next(body for url, body in posted if url.endswith("/user"))
         self.assertEqual(user_post["username"], "alice")
+        self.assertEqual(user_post["email"], "alice@target.example.com")
         policy_post = next(body for url, body in posted if url.endswith("/policies"))
         self.assertEqual(policy_post["teamSlug"], "team-target")
         self.assertEqual(
             policy_post["steps"][0]["entries"][0]["rotationGroup"]["slug"],
             "rtg-target",
+        )
+
+    def test_apply_remapped_email_in_escalation_policy(self) -> None:
+        policy_details = {
+            "pol-alpha": [
+                {
+                    "timeout": 0,
+                    "entries": [
+                        {
+                            "executionType": "email",
+                            "email": {"address": "oncall@example.com"},
+                        }
+                    ],
+                }
+            ]
+        }
+        (self.inventory_dir / "escalation_policy_details_inventory.json").write_text(
+            json.dumps(policy_details)
+        )
+        self.pipeline.remapping = RemappingContext(
+            {
+                "users": {"alice": "alice"},
+                "emails": {
+                    "alice@example.com": "alice@target.example.com",
+                    "oncall@example.com": "oncall@target.example.com",
+                },
+                "teams": {"team-alpha": "team-alpha"},
+                "routing_keys": {"ALPHA": "ALPHA"},
+                "escalation_policies": {"pol-alpha": "pol-alpha"},
+                "alert_rules": {"1": "1"},
+                "outbound_webhooks": {},
+            }
+        )
+        self.client.dry_run = False
+
+        def fake_get(url, timeout=30):
+            if url.endswith("/user/alice"):
+                return FakeResponse({"username": "alice"}, status_code=200)
+            if url.endswith("/team"):
+                return FakeResponse([], status_code=200)
+            if "/members" in url:
+                return FakeResponse({"members": [{"username": "alice"}]}, status_code=200)
+            if "/rotations" in url:
+                return FakeResponse(
+                    {"rotationGroups": [{"label": "Primary", "slug": "rtg-target"}]},
+                    status_code=200,
+                )
+            if "/policies/pol-alpha" in url:
+                return FakeResponse({}, status_code=404)
+            return FakeResponse({}, status_code=404)
+
+        self.client.session.get = mock.MagicMock(side_effect=fake_get)
+        posted = []
+
+        def fake_post(url, json=None, timeout=30):
+            posted.append((url, json))
+            if url.endswith("/team"):
+                return FakeResponse({"slug": "team-target", "name": "Alpha Team"}, status_code=200)
+            if url.endswith("/policies"):
+                return FakeResponse({"slug": "pol-target"}, status_code=200)
+            if url.endswith("/org/routing-keys"):
+                return FakeResponse({"routingKey": "ALPHA"}, status_code=200)
+            if url.endswith("/alertRules"):
+                return FakeResponse({"id": 99}, status_code=200)
+            return FakeResponse({}, status_code=200)
+
+        self.client.session.post = mock.MagicMock(side_effect=fake_post)
+
+        with mock.patch.object(self.client.rate_limiter, "wait"):
+            self.pipeline._index_policy_metadata()
+            self.pipeline.apply_escalation_policies()
+
+        policy_post = next(body for url, body in posted if url.endswith("/policies"))
+        self.assertEqual(
+            policy_post["steps"][0]["entries"][0]["email"]["address"],
+            "oncall@target.example.com",
         )
 
 

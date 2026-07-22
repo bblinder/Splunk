@@ -52,9 +52,39 @@ class RemappingGenerator:
             log.error(f"Failed to parse {path}")
             return []
 
+    def _collect_emails(self, users: Any, policy_details: Any) -> Dict[str, str]:
+        emails: Dict[str, str] = {}
+
+        if isinstance(users, list):
+            for user in users:
+                if not isinstance(user, dict):
+                    continue
+                address = user.get("email")
+                if address:
+                    emails[address] = address
+
+        if isinstance(policy_details, dict):
+            for steps in policy_details.values():
+                if not isinstance(steps, list):
+                    continue
+                for step in steps:
+                    if not isinstance(step, dict):
+                        continue
+                    for entry in step.get("entries", []):
+                        if not isinstance(entry, dict):
+                            continue
+                        if entry.get("executionType") != "email":
+                            continue
+                        address = entry.get("email", {}).get("address")
+                        if address:
+                            emails[address] = address
+
+        return emails
+
     def generate(self) -> Dict[str, Dict[str, str]]:
         remapping = {
             "users": {},
+            "emails": {},
             "teams": {},
             "routing_keys": {},
             "escalation_policies": {},
@@ -66,6 +96,9 @@ class RemappingGenerator:
         for u in users:
             if isinstance(u, dict) and "username" in u:
                 remapping["users"][u["username"]] = u["username"]
+
+        policy_details = self._load_json("escalation_policy_details_inventory.json")
+        remapping["emails"] = self._collect_emails(users, policy_details)
 
         teams = self._load_json("teams_inventory.json")
         for t in teams:
@@ -102,8 +135,9 @@ class RemappingGenerator:
 
         log.info(f"Generated remapping template at {self.output_file}")
         log.info(
-            "Counts: %d users, %d teams, %d routing keys, %d policies, %d alert rules, %d webhooks.",
+            "Counts: %d users, %d emails, %d teams, %d routing keys, %d policies, %d alert rules, %d webhooks.",
             len(remapping["users"]),
+            len(remapping["emails"]),
             len(remapping["teams"]),
             len(remapping["routing_keys"]),
             len(remapping["escalation_policies"]),

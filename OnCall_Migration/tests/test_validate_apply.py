@@ -60,10 +60,34 @@ class PreFlightValidatorTest(unittest.TestCase):
                 ]
             )
         )
+        (self.inventory_dir / "users_inventory.json").write_text(
+            json.dumps([{"username": "alice", "email": "alice@example.com"}])
+        )
+        (self.inventory_dir / "escalation_policy_details_inventory.json").write_text(
+            json.dumps(
+                {
+                    "pol-alpha": [
+                        {
+                            "timeout": 0,
+                            "entries": [
+                                {
+                                    "executionType": "email",
+                                    "email": {"address": "oncall@example.com"},
+                                }
+                            ],
+                        }
+                    ]
+                }
+            )
+        )
         self.remapping_file.write_text(
             json.dumps(
                 {
                     "users": {"alice": "alice", "bob": "bob"},
+                    "emails": {
+                        "alice@example.com": "alice@example.com",
+                        "oncall@example.com": "oncall@example.com",
+                    },
                     "teams": {"team-alpha": "team-alpha"},
                     "routing_keys": {"ALPHA": "ALPHA"},
                     "escalation_policies": {"pol-alpha": "pol-alpha"},
@@ -94,6 +118,14 @@ class PreFlightValidatorTest(unittest.TestCase):
         validator.validate()
         self.assertGreater(validator.warnings, 0)
         self.assertGreater(validator.errors, 0)
+
+    def test_validate_fails_when_policy_email_missing(self) -> None:
+        remapping = json.loads(self.remapping_file.read_text())
+        remapping["emails"] = {"alice@example.com": "alice@example.com"}
+        self.remapping_file.write_text(json.dumps(remapping))
+
+        validator = PreFlightValidator(self.inventory_dir, self.remapping_file)
+        self.assertGreater(validator.validate(), 0)
 
     def test_main_exits_on_failure(self) -> None:
         remapping = json.loads(self.remapping_file.read_text())
