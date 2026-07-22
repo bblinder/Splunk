@@ -34,16 +34,17 @@ OnCall_Migration/
 │   ├── inventory_summary.md
 │   ├── remapping.json
 │   └── apply_report.json         # written after apply
-├── manual_capture/               # gitignored — portal / IdP gaps
+├── manual_capture/               # templates tracked; integration JSON captures gitignored
 │   ├── README.md
 │   ├── capture_status.json
 │   ├── integrations/
+│   │   └── integration.example.json
 │   ├── user_permissions/
 │   └── sso/
 └── discovery_run.log             # gitignored — discovery HTTP log
 ```
 
-Paths marked **gitignored** are local operator artifacts; back them up before source org access ends. **Do not commit any changes to these paths.**
+Paths marked **gitignored** (`inventory/`, `.env`, `discovery_run.log`, filled `manual_capture/integrations/*.json`) are local operator artifacts; back them up before source org access ends. **Do not commit secrets** in those paths.
 
 ## Quick Start
 

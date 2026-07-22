@@ -81,10 +81,11 @@ OnCall_Migration/
 │   ├── inventory_summary.md
 │   ├── remapping.json
 │   └── apply_report.json         # written after apply
-├── manual_capture/               # gitignored — portal / IdP gaps
+├── manual_capture/               # templates tracked; integration JSON captures gitignored
 │   ├── README.md
 │   ├── capture_status.json
 │   ├── integrations/
+│   │   └── integration.example.json
 │   ├── user_permissions/
 │   └── sso/
 └── discovery_run.log             # gitignored — discovery HTTP log
@@ -106,7 +107,7 @@ OnCall_Migration/
 | `tests/` | Mocked unit tests (no live API calls) |
 | `docs/` | Migration guide and post-discovery validation template (`VALIDATION_REPORT.md`) |
 | `inventory/` | API export output and `remapping.json` (gitignored) |
-| `manual_capture/` | Manual capture templates and operator notes (gitignored) |
+| `manual_capture/` | Manual capture templates and operator notes (tracked); filled `integrations/*.json` gitignored |
 | `README.md` | Quick start, workflow, scope |
 | `.env` | Source/target API credentials (gitignored) |
 | `.env.example` | Credential template |
@@ -246,7 +247,7 @@ SSO backend config is coordinated with Splunk support; document IdP-side setting
 
 - Never commit API keys, webhook signatures, integration credentials, or SAML metadata
 - Store secrets in a vault; reference paths in templates only
-- `inventory/`, `manual_capture/`, `.env` are gitignored
+- `inventory/`, `.env`, and filled `manual_capture/integrations/*.json` (except `integration.example.json`) are gitignored
 
 ---
 
