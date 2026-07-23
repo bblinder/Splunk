@@ -14,6 +14,7 @@ OnCall_Migration/
 ├── generate_remapping.py         # step 3
 ├── validate_apply.py             # step 4
 ├── apply.py                      # steps 5–6 (dry-run / --apply)
+├── apply_contact_methods_and_policies.py  # step 7 — deferred user settings
 ├── utils/
 │   ├── env_loader.py
 │   ├── io.py
@@ -26,7 +27,8 @@ OnCall_Migration/
 │   └── team_scope.py
 ├── docs/
 │   ├── MIGRATION_GUIDE.md
-│   └── VALIDATION_REPORT.md
+│   ├── VALIDATION_REPORT.md
+│   └── HANDOFF_PROMPT.md
 ├── tests/
 │   ├── test_discovery.py
 │   ├── test_apply.py
@@ -72,7 +74,7 @@ SOURCE_SPLUNK_ONCALL_API_KEY=...
 SOURCE_SPLUNK_ONCALL_ORG_SLUG=...
 ```
 
-**Target Credentials (used by `apply.py`):**
+**Target Credentials (used by `apply.py` and `apply_contact_methods_and_policies.py`):**
 ```bash
 TARGET_SPLUNK_ONCALL_API_ID=...
 TARGET_SPLUNK_ONCALL_API_KEY=...
@@ -97,8 +99,10 @@ Follow these steps in order to migrate your Splunk On-Call configuration:
    `python3 apply.py`
 6. **Apply**: Execute the migration to the target organization.
    `python3 apply.py --apply`
+7. **Deferred user settings**: Migrate contact methods and paging policies (run after users exist in target).
+   `python3 apply_contact_methods_and_policies.py` (dry-run) then `python3 apply_contact_methods_and_policies.py --apply`
 
-Optional path flags: `--inventory` (default `inventory`), `--remapping` (default `inventory/remapping.json`) on `generate_remapping.py`, `validate_apply.py`, and `apply.py`; `--username-suffix` (default empty) on `generate_remapping.py`; `--inventory` on `discovery.py` and `validate_inventory.py`; `--teams` / `--teams-file` on `discovery.py` for scoped exports. See the Migration Guide CLI reference.
+Optional path flags: `--inventory` (default `inventory`), `--remapping` (default `inventory/remapping.json`) on `generate_remapping.py`, `validate_apply.py`, `apply.py`, and `apply_contact_methods_and_policies.py`; `--username-suffix` (default empty) on `generate_remapping.py`; `--inventory` on `discovery.py` and `validate_inventory.py`; `--teams` / `--teams-file` on `discovery.py` for scoped exports. See the Migration Guide CLI reference.
 
 All pipeline scripts accept `-h` / `--help` for flags and defaults. See [`docs/MIGRATION_GUIDE.md`](docs/MIGRATION_GUIDE.md) for more detailed information on CLI/flags options.
 
@@ -106,9 +110,9 @@ All pipeline scripts accept `-h` / `--help` for flags and defaults. See [`docs/M
 
 ## Safety & Important Notes
 
-- **Dry run first:** `python3 apply.py` (no `--apply`) simulates the migration and writes `inventory/apply_report.json` without changing the target org. Review that report before you run with `--apply`.
+- **Dry run first:** `python3 apply.py` (no `--apply`) simulates the migration and writes `inventory/apply_report.json` without changing the target org. Review that report before you run with `--apply`. After primary apply, run `python3 apply_contact_methods_and_policies.py` (dry-run default) before `--apply` for contact methods and paging policies.
 - **Escalation policies cannot be edited later:** Once created in the target org, policy steps and routing cannot be changed through the API. Double-check `inventory/remapping.json` and run `python3 validate_apply.py` before applying.
-- **Re-running apply:** A second run is mostly safe for resources that already exist — users, teams, members, rotations, and escalation policies are skipped when found. Routing keys and alert rules are posted again and may fail or duplicate if they already exist. A policy created with wrong steps cannot be fixed by re-applying; fix it in the target UI or delete and recreate the policy manually, then adjust remapping if needed.
+- **Re-running apply:** A second run is mostly safe for resources that already exist — users, teams, members, rotations, and escalation policies are skipped when found. Routing keys and alert rules are posted again and may fail or duplicate if they already exist. A policy created with wrong steps cannot be fixed by re-applying; fix it in the target UI or delete and recreate the policy manually, then adjust remapping if needed. Re-running `apply_contact_methods_and_policies.py --apply` does **not** skip existing contact methods or paging steps — dry-run first to avoid duplicates.
 - **Overwrites:** Running `generate_remapping.py` overwrites `inventory/remapping.json`. Back up any manual edits before re-running.
 
 ## Scope & Reference
@@ -116,15 +120,17 @@ All pipeline scripts accept `-h` / `--help` for flags and defaults. See [`docs/M
 ### Included Resources
 The migration covers the following core resources:
 - `users`, `teams`, `members`, `rotations`, `escalation_policies`, `routing_keys`, `alert_rules`
+- `contact_methods`, `paging_policies` (via `apply_contact_methods_and_policies.py` after primary apply)
 
-### Deferred / Manual Tasks
-The following are excluded from the automated run and may require manual handling or separate scripts:
-- **Deferred:** `contact_methods`, `paging_policies`, `outbound_webhooks`, `active_overrides`, `integrations`, `SSO`.
-- **Manual:** Team admins (no public POST API).
+### Not covered by primary apply (`apply.py`)
+- **Deferred script (step 7):** `contact_methods`, `paging_policies` via `apply_contact_methods_and_policies.py`.
+- **Still deferred / manual:** `outbound_webhooks`, `active_overrides`, `integrations`, `SSO`.
+- **Manual after apply:** Team admins (no public POST API). Push notification devices (users must log in on target to register).
 
 ### Documentation
 - **Migration Guide**: [`docs/MIGRATION_GUIDE.md`](docs/MIGRATION_GUIDE.md) (Schema, API notes, checklists, repository layout)
 - **Validation Template**: [`docs/VALIDATION_REPORT.md`](docs/VALIDATION_REPORT.md) (Template for recording results)
+- **Handoff Prompt**: [`docs/HANDOFF_PROMPT.md`](docs/HANDOFF_PROMPT.md) (Copy-paste context for another LLM)
 - **Support modules**: [`utils/`](utils/) — `env_loader`, `io`, `cli`, `http_client`, `rate_limiter`, `exceptions`, `migration_types`, `summary_reporter`, `team_scope`
 
 ## Tests

@@ -57,7 +57,7 @@ class PreFlightValidator:
         return ""
 
     def _is_skipped(self, mappings: Dict[str, Any], key: str) -> bool:
-        return key not in mappings or mappings.get(key) is None
+        return key in mappings and mappings.get(key) is None
 
     def validate(self) -> int:
         log.info("Starting pre-flight validation...")

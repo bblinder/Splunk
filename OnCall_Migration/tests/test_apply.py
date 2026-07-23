@@ -263,6 +263,93 @@ class ApplyPipelineTest(unittest.TestCase):
             "oncall@target.example.com",
         )
 
+    def test_post_succeeded_counts_201_as_created(self) -> None:
+        self.client.dry_run = False
+
+        self.client.session.get = mock.MagicMock(return_value=FakeResponse({}, status_code=404))
+        self.client.session.post = mock.MagicMock(
+            return_value=FakeResponse({"username": "alice"}, status_code=201)
+        )
+
+        with mock.patch.object(self.client.rate_limiter, "wait"):
+            self.pipeline.apply_users()
+
+        self.assertEqual(self.pipeline.stats["users"]["created"], 1)
+        self.assertEqual(self.pipeline.stats["users"].get("failed", 0), 0)
+
+    def test_escalation_policy_skips_by_remapped_slug(self) -> None:
+        self.pipeline.remapping = RemappingContext(
+            {
+                "users": {"alice": "alice"},
+                "emails": {"alice@example.com": "alice@target.example.com"},
+                "teams": {"team-alpha": "team-alpha"},
+                "routing_keys": {"ALPHA": "ALPHA"},
+                "escalation_policies": {"pol-alpha": "pol-target"},
+                "alert_rules": {"1": "1"},
+                "outbound_webhooks": {},
+            }
+        )
+        self.client.dry_run = False
+        get_urls = []
+
+        def fake_get(url, timeout=30):
+            get_urls.append(url)
+            if "/policies/pol-target" in url:
+                return FakeResponse({"slug": "pol-target"}, status_code=200)
+            return FakeResponse({}, status_code=404)
+
+        self.client.session.get = mock.MagicMock(side_effect=fake_get)
+        self.client.session.post = mock.MagicMock()
+
+        with mock.patch.object(self.client.rate_limiter, "wait"):
+            self.pipeline._index_policy_metadata()
+            self.pipeline.apply_escalation_policies()
+
+        self.assertTrue(any("/policies/pol-target" in url for url in get_urls))
+        self.client.session.post.assert_not_called()
+        self.assertEqual(self.pipeline.stats["escalation_policies"]["skipped"], 1)
+
+    def test_routing_key_skipped_when_exists(self) -> None:
+        self.client.dry_run = False
+
+        def fake_get(url, timeout=30):
+            if url.endswith("/org/routing-keys"):
+                return FakeResponse({"routingKeys": [{"routingKey": "ALPHA"}]}, status_code=200)
+            return FakeResponse({}, status_code=404)
+
+        self.client.session.get = mock.MagicMock(side_effect=fake_get)
+        self.client.session.post = mock.MagicMock()
+
+        with mock.patch.object(self.client.rate_limiter, "wait"):
+            self.pipeline.apply_routing_keys()
+
+        self.client.session.post.assert_not_called()
+        self.assertEqual(self.pipeline.stats["routing_keys"]["skipped"], 1)
+
+    def test_alert_rule_skipped_when_signature_exists(self) -> None:
+        self.client.dry_run = False
+
+        def fake_get(url, timeout=30):
+            if url.endswith("/alertRules"):
+                return FakeResponse(
+                    {
+                        "alertRules": [
+                            {"alertField": "routing_key", "alertValueMatch": "ALPHA", "rank": 1}
+                        ]
+                    },
+                    status_code=200,
+                )
+            return FakeResponse({}, status_code=404)
+
+        self.client.session.get = mock.MagicMock(side_effect=fake_get)
+        self.client.session.post = mock.MagicMock()
+
+        with mock.patch.object(self.client.rate_limiter, "wait"):
+            self.pipeline.apply_alert_rules()
+
+        self.client.session.post.assert_not_called()
+        self.assertEqual(self.pipeline.stats["alert_rules"]["skipped"], 1)
+
 
 class ApplyMainEnvTest(unittest.TestCase):
     def test_main_exits_when_target_env_missing(self) -> None:

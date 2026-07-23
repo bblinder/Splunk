@@ -46,6 +46,17 @@ class RemappingGeneratorTest(unittest.TestCase):
             },
             "alert_rules_inventory.json": [{"id": 42, "rank": 1, "alertField": "routing_key"}],
             "outbound_webhooks_inventory.json": [{"slug": "wh-test", "label": "Test"}],
+            "contact_methods_inventory.json": {
+                "alice": {
+                    "emails": {
+                        "contactMethods": [
+                            {"value": "alice@example.com", "label": "Default"},
+                            {"value": "alice.alt@example.com", "label": "Alt"},
+                        ]
+                    },
+                    "phones": {"contactMethods": []},
+                }
+            },
         }
         for name, data in fixtures.items():
             (self.inventory_dir / name).write_text(json.dumps(data))
@@ -62,13 +73,14 @@ class RemappingGeneratorTest(unittest.TestCase):
         self.assertEqual(result["escalation_policies"]["pol-alpha"], "pol-alpha")
         self.assertEqual(result["alert_rules"]["42"], "42")
         self.assertEqual(result["outbound_webhooks"]["wh-test"], "wh-test")
+        self.assertEqual(result["emails"]["alice.alt@example.com"], "alice.alt@example.com")
         self.assertTrue(self.output_file.exists())
 
     def test_username_suffix_appended_to_target(self) -> None:
-        generator = RemappingGenerator(self.inventory_dir, self.output_file, username_suffix="-aven")
+        generator = RemappingGenerator(self.inventory_dir, self.output_file, username_suffix="-splunk")
         result = generator.generate()
 
-        self.assertEqual(result["users"]["alice"], "alice-aven")
+        self.assertEqual(result["users"]["alice"], "alice-splunk")
         self.assertEqual(result["emails"]["alice@example.com"], "alice@example.com")
 
 

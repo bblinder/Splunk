@@ -168,12 +168,19 @@ def collect_usernames(
     members_by_team: Dict[str, Any],
     rotations_by_team: Dict[str, Any],
     team_slugs: Set[str],
+    admins_by_team: Dict[str, Any] | None = None,
+    policy_details: Dict[str, Any] | None = None,
+    policy_slugs: Set[str] | None = None,
 ) -> Set[str]:
     usernames: Set[str] = set()
     for team_slug in team_slugs:
         for member in _team_user_entries(members_by_team.get(team_slug)):
             if isinstance(member, dict) and member.get("username"):
                 usernames.add(member["username"])
+        if admins_by_team:
+            for admin in _team_user_entries(admins_by_team.get(team_slug)):
+                if isinstance(admin, dict) and admin.get("username"):
+                    usernames.add(admin["username"])
         rotation_payload = rotations_by_team.get(team_slug, {})
         if not isinstance(rotation_payload, dict):
             continue
@@ -186,6 +193,21 @@ def collect_usernames(
                 for shift_member in shift.get("shiftMembers", []) or []:
                     if isinstance(shift_member, dict) and shift_member.get("username"):
                         usernames.add(shift_member["username"])
+
+    if policy_details:
+        slugs = policy_slugs if policy_slugs is not None else set(policy_details.keys())
+        for slug in slugs:
+            for step in policy_details.get(slug, []) or []:
+                if not isinstance(step, dict):
+                    continue
+                for entry in step.get("entries", []) or []:
+                    if not isinstance(entry, dict):
+                        continue
+                    if entry.get("executionType") != "user":
+                        continue
+                    username = (entry.get("user") or {}).get("username")
+                    if username:
+                        usernames.add(username)
     return usernames
 
 

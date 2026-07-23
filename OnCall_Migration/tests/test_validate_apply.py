@@ -119,6 +119,22 @@ class PreFlightValidatorTest(unittest.TestCase):
         self.assertGreater(validator.warnings, 0)
         self.assertGreater(validator.errors, 0)
 
+    def test_validate_errors_when_user_missing_from_remapping(self) -> None:
+        # A user whose email is not mapped and who is absent from remapping.users
+        # must NOT be treated as skipped (aligns with RemappingContext semantics),
+        # so the missing email surfaces as an error rather than being silently skipped.
+        (self.inventory_dir / "users_inventory.json").write_text(
+            json.dumps(
+                [
+                    {"username": "alice", "email": "alice@example.com"},
+                    {"username": "carol", "email": "carol@example.com"},
+                ]
+            )
+        )
+
+        validator = PreFlightValidator(self.inventory_dir, self.remapping_file)
+        self.assertGreater(validator.validate(), 0)
+
     def test_validate_fails_when_policy_email_missing(self) -> None:
         remapping = json.loads(self.remapping_file.read_text())
         remapping["emails"] = {"alice@example.com": "alice@example.com"}

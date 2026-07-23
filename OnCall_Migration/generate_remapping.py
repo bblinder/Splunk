@@ -51,7 +51,7 @@ class RemappingGenerator:
     def _load_json(self, filename: str) -> Any:
         return load_json(self.inventory_dir / filename, default=[], logger=log)
 
-    def _collect_emails(self, users: Any, policy_details: Any) -> Dict[str, str]:
+    def _collect_emails(self, users: Any, policy_details: Any, contact_methods: Any = None) -> Dict[str, str]:
         emails: Dict[str, str] = {}
 
         if isinstance(users, list):
@@ -61,6 +61,20 @@ class RemappingGenerator:
                 address = user.get("email")
                 if address:
                     emails[address] = address
+
+        if isinstance(contact_methods, dict):
+            for methods in contact_methods.values():
+                if not isinstance(methods, dict):
+                    continue
+                email_category = methods.get("emails")
+                if not isinstance(email_category, dict):
+                    continue
+                for method in email_category.get("contactMethods", []) or []:
+                    if not isinstance(method, dict):
+                        continue
+                    address = method.get("value")
+                    if address:
+                        emails.setdefault(address, address)
 
         if isinstance(policy_details, dict):
             for steps in policy_details.values():
@@ -97,7 +111,8 @@ class RemappingGenerator:
                 remapping["users"][u["username"]] = f"{u['username']}{self.username_suffix}"
 
         policy_details = self._load_json("escalation_policy_details_inventory.json")
-        remapping["emails"] = self._collect_emails(users, policy_details)
+        contact_methods = self._load_json("contact_methods_inventory.json")
+        remapping["emails"] = self._collect_emails(users, policy_details, contact_methods)
 
         teams = self._load_json("teams_inventory.json")
         for t in teams:

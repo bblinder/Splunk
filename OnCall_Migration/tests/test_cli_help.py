@@ -13,6 +13,7 @@ PIPELINE_SCRIPTS = (
     "generate_remapping.py",
     "validate_apply.py",
     "apply.py",
+    "apply_contact_methods_and_policies.py",
 )
 
 

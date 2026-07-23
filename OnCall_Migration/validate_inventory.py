@@ -9,6 +9,7 @@ Usage:
 """
 
 import argparse
+import json
 import logging
 import sys
 from pathlib import Path
@@ -41,6 +42,13 @@ TEAM_SCOPED_FILES = (
     "schedules_inventory",
 )
 
+# Per-team files that may legitimately omit teams (sparse): only validate shape
+# and warn on keys not present in teams_inventory. Missing files are tolerated.
+OPTIONAL_TEAM_SCOPED_FILES = (
+    "escalation_policies_inventory",
+    "scheduled_overrides_inventory",
+)
+
 
 class InventoryValidator:
     """Validates on-disk inventory consistency after discovery (no API calls)."""
@@ -51,7 +59,13 @@ class InventoryValidator:
         self.warnings = 0
 
     def _load_json(self, name: str) -> Any:
-        return load_json(self.inventory_dir / f"{name}.json")
+        path = self.inventory_dir / f"{name}.json"
+        try:
+            return load_json(path)
+        except json.JSONDecodeError:
+            self.errors += 1
+            log.error(f"Failed to parse {name}.json (invalid JSON).")
+            return None
 
     def _count_items(self, name: str, data: Any) -> int:
         if data is None:
@@ -69,6 +83,8 @@ class InventoryValidator:
     def validate(self) -> int:
         log.info("Starting inventory validation...")
         self._validate_team_coverage()
+        self._validate_optional_team_coverage()
+        self._validate_user_coverage()
         self._validate_scope_metadata()
         self._validate_metadata_counts()
         self._validate_routing_key_policies()
@@ -103,6 +119,49 @@ class InventoryValidator:
             if extra:
                 self.warnings += 1
                 log.warning(f"{inventory_name}: {len(extra)} key(s) not in teams_inventory.")
+
+    def _validate_optional_team_coverage(self) -> None:
+        teams = self._load_json("teams_inventory") or []
+        team_slugs = {t.get("slug") for t in teams if isinstance(t, dict) and t.get("slug")}
+
+        for inventory_name in OPTIONAL_TEAM_SCOPED_FILES:
+            data = self._load_json(inventory_name)
+            if data is None:
+                continue
+            if not isinstance(data, dict):
+                self.errors += 1
+                log.error(f"{inventory_name}.json must be a dict keyed by team slug.")
+                continue
+            extra = sorted(set(data.keys()) - team_slugs)
+            if extra:
+                self.warnings += 1
+                log.warning(f"{inventory_name}: {len(extra)} key(s) not in teams_inventory.")
+
+    def _validate_user_coverage(self) -> None:
+        users = self._load_json("users_inventory")
+        if not isinstance(users, list) or not users:
+            return
+        usernames = {u.get("username") for u in users if isinstance(u, dict) and u.get("username")}
+
+        for inventory_name in ("contact_methods_inventory", "paging_policies_inventory"):
+            data = self._load_json(inventory_name)
+            if not isinstance(data, dict):
+                continue
+            keys = set(data.keys())
+            missing = sorted(usernames - keys)
+            orphan = sorted(keys - usernames)
+            if missing:
+                self.warnings += 1
+                log.warning(
+                    f"{inventory_name}: {len(missing)} user(s) from users_inventory "
+                    f"have no entry, e.g. {missing[:3]}"
+                )
+            if orphan:
+                self.errors += 1
+                log.error(
+                    f"{inventory_name}: {len(orphan)} key(s) not in users_inventory, "
+                    f"e.g. {orphan[:3]}"
+                )
 
     def _validate_scope_metadata(self) -> None:
         metadata = self._load_json("discovery_metadata")

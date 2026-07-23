@@ -10,9 +10,10 @@ Build a **complete, durable configuration snapshot** of a Splunk On-Call org:
 
 1. **API discovery** — export all public-API-discoverable config to JSON
 2. **Manual capture** — document gaps the API cannot list (integrations, global permissions, SSO)
-3. **Apply** — provision target org from inventory + remapping
+3. **Primary apply** — provision core target-org config from inventory + remapping via `apply.py`
+4. **Deferred user settings** — contact methods and paging policies via `apply_contact_methods_and_policies.py` (after users exist in target)
 
-Terraform was evaluated and rejected for the apply step: the `splunk/victorops` provider doesn't cover all resources and is inconsistently maintained. Target-org provisioning is implemented in `apply.py` instead.
+Terraform was evaluated and rejected for the apply step: the `splunk/victorops` provider doesn't cover all resources and is inconsistently maintained. Target-org provisioning is implemented in `apply.py` and the deferred script instead.
 
 ---
 
@@ -28,21 +29,24 @@ Terraform was evaluated and rejected for the apply step: the `splunk/victorops` 
 | 4 | Pre-flight | `python3 validate_apply.py` | Exit 0/1 — remapping integrity |
 | 5 | Dry run | `python3 apply.py` | No writes to target org |
 | 6 | Apply | `python3 apply.py --apply` | `inventory/apply_report.json` |
+| 7 | Deferred user settings | `python3 apply_contact_methods_and_policies.py` then `--apply` | Contact methods + paging steps (dry-run default; run after step 6). See [Phase 3b](#phase-3b-deferred-user-settings). |
 
 **uv:** With a project `.venv`, prefix commands with `uv run` (e.g. `uv run python3 discovery.py`). Without a venv, use `uv run --with requests python3 <script>.py` for any pipeline script.
 
 ### Safety and important notes
 
-- **Dry run first:** `python3 apply.py` (no `--apply`) simulates the migration and writes `inventory/apply_report.json` without changing the target org. Review that report before you run with `--apply`.
+- **Dry run first:** `python3 apply.py` (no `--apply`) simulates the migration and writes `inventory/apply_report.json` without changing the target org. Review that report before you run with `--apply`. After primary apply, run `python3 apply_contact_methods_and_policies.py` (dry-run default) before `--apply` for contact methods and paging policies — the deferred script logs planned POSTs but does not write a separate report file.
 - **Escalation policies cannot be edited later:** Once created in the target org, policy steps and routing cannot be changed through the API. Double-check `inventory/remapping.json` and run `python3 validate_apply.py` before applying.
-- **Re-running apply:** A second run is mostly safe for resources that already exist — users, teams, members, rotations, and escalation policies are skipped when found. Routing keys and alert rules are posted again and may fail or duplicate if they already exist. A policy created with wrong steps cannot be fixed by re-applying; fix it in the target UI or delete and recreate the policy manually, then adjust remapping if needed.
+- **Re-running apply:** A second run is mostly safe for resources that already exist — users, teams, members, rotations, and escalation policies are skipped when found. Routing keys and alert rules are posted again and may fail or duplicate if they already exist. A policy created with wrong steps cannot be fixed by re-applying; fix it in the target UI or delete and recreate the policy manually, then adjust remapping if needed. Re-running `apply_contact_methods_and_policies.py --apply` does **not** skip existing contact methods or paging steps — dry-run first to avoid duplicates.
 - **Overwrites:** Re-running `generate_remapping.py` overwrites `inventory/remapping.json`. Back up manual edits first.
 
 ### Scope
 
 **Included in automated apply:** `users`, `teams`, `members`, `rotations`, `escalation_policies`, `routing_keys`, `alert_rules`
 
-**Deferred:** `contact_methods`, `paging_policies`, `outbound_webhooks`, `active_overrides`, `integrations`, `SSO`
+**Applied by deferred script (`apply_contact_methods_and_policies.py`, after primary apply):** `contact_methods`, `paging_policies`
+
+**Deferred:** `outbound_webhooks`, `active_overrides`, `integrations`, `SSO`
 
 **Manual after apply:** Team admins (no public POST API)
 
@@ -60,6 +64,7 @@ OnCall_Migration/
 ├── generate_remapping.py         # step 3
 ├── validate_apply.py             # step 4
 ├── apply.py                      # steps 5–6 (dry-run / --apply)
+├── apply_contact_methods_and_policies.py  # step 7 — deferred user settings
 ├── utils/
 │   ├── env_loader.py
 │   ├── io.py
@@ -72,7 +77,8 @@ OnCall_Migration/
 │   └── team_scope.py
 ├── docs/
 │   ├── MIGRATION_GUIDE.md
-│   └── VALIDATION_REPORT.md
+│   ├── VALIDATION_REPORT.md
+│   └── HANDOFF_PROMPT.md
 ├── tests/
 │   ├── test_discovery.py
 │   ├── test_apply.py
@@ -100,6 +106,7 @@ OnCall_Migration/
 | `generate_remapping.py` | Build `remapping.json` template from inventory |
 | `validate_apply.py` | Pre-flight remapping + relational integrity checks |
 | `apply.py` | Target-org provisioning (dry-run default; `--apply` to write) |
+| `apply_contact_methods_and_policies.py` | Deferred user contact methods and paging policies (dry-run default; run after `apply.py --apply`) |
 | `utils/env_loader.py` | Project-root `.env` loading (shared by `discovery.py` and `apply.py`) |
 | `utils/io.py` | Shared `load_json()` for inventory/remapping reads |
 | `utils/cli.py` | `-h`/`--help` guard before heavy imports |
@@ -110,7 +117,7 @@ OnCall_Migration/
 | `utils/migration_types.py` | Shared type aliases (`InventoryCounts`, etc.) |
 | `utils/team_scope.py` | Scoped discovery filtering (team slugs, policy closure, alert/routing-key subset) |
 | `tests/` | Mocked unit tests (no live API calls) |
-| `docs/` | Migration guide and post-discovery validation template (`VALIDATION_REPORT.md`) |
+| `docs/` | Migration guide, validation template, and LLM handoff prompt |
 | `inventory/` | API export output and `remapping.json` (gitignored) |
 | `manual_capture/` | Manual capture templates and operator notes (tracked); filled `integrations/*.json` gitignored |
 | `README.md` | Quick start, workflow, scope |
@@ -127,7 +134,7 @@ python3 discovery.py
 # uv (ephemeral):     uv run --with requests python3 discovery.py
 ```
 
-Replace `discovery.py` with any pipeline script (`validate_inventory.py`, `generate_remapping.py`, `validate_apply.py`, `apply.py`).
+Replace `discovery.py` with any pipeline script (`validate_inventory.py`, `generate_remapping.py`, `validate_apply.py`, `apply.py`, `apply_contact_methods_and_policies.py`).
 
 Every pipeline script supports `-h` / `--help` for flags and defaults (e.g. `python3 apply.py -h`).
 
@@ -140,6 +147,7 @@ Every pipeline script supports `-h` / `--help` for flags and defaults (e.g. `pyt
 | `generate_remapping.py` | `--inventory`, `--remapping`, `--username-suffix` | `inventory`, `inventory/remapping.json`, `""` (no suffix) |
 | `validate_apply.py` | `--inventory`, `--remapping` | same |
 | `apply.py` | `--apply`, `--inventory`, `--remapping` | same |
+| `apply_contact_methods_and_policies.py` | `--apply`, `--inventory`, `--remapping` | same |
 
 **Run tests:**
 
@@ -189,7 +197,7 @@ python3 discovery.py --teams-file inventory/team_scope.txt
 | `alert_rules_inventory.json` | Global | Rules sorted by `rank` |
 | `outbound_webhooks_inventory.json` | Global | Outbound webhook definitions |
 | `contact_methods_inventory.json` | Per-user | Devices, emails, phones |
-| `paging_policies_inventory.json` | Per-user | User paging rules |
+| `paging_policies_inventory.json` | Per-user | Primary paging policy steps (list per username) |
 | `team_members_inventory.json` | Per-team | User-to-team mapping |
 | `team_admins_inventory.json` | Per-team | Team administrators |
 | `escalation_policies_inventory.json` | Per-team | Policy summaries (name, slug) |
@@ -199,7 +207,7 @@ python3 discovery.py --teams-file inventory/team_scope.txt
 | `scheduled_overrides_inventory.json` | Per-team | Active overrides only |
 | `discovery_metadata.json` | Global | Counts, timestamps, `files_written`, `manual_capture_required` |
 | `inventory_summary.md` | Global | Human-readable Markdown catalog (written by `SummaryReporter`) |
-| `remapping.json` | Global | Source-to-target identifier map (steps 3–5) |
+| `remapping.json` | Global | Source-to-target identifier map (steps 3–7) |
 | `apply_report.json` | Global | Per-step apply stats and slug maps (after apply) |
 
 ### Runtime
@@ -253,6 +261,27 @@ SSO backend config is coordinated with Splunk support; document IdP-side setting
 - Never commit API keys, webhook signatures, integration credentials, or SAML metadata
 - Store secrets in a vault; reference paths in templates only
 - `inventory/`, `.env`, and filled `manual_capture/integrations/*.json` (except `integration.example.json`) are gitignored
+
+---
+
+## Remapping (step 3)
+
+`generate_remapping.py` produces seven categories: `users`, `emails`, `teams`, `routing_keys`, `escalation_policies`, `alert_rules`, `outbound_webhooks`. Output defaults to `inventory/remapping.json`. Set any value to `null` to skip that resource. Re-running the generator overwrites the file.
+
+**Usernames:** Usernames are globally unique across the entire Splunk On-Call environment (shared across orgs). By default the generator maps each source username to itself. Pass `--username-suffix=-splunk` (the leading `-` requires the `=` form) to append a suffix to every target username value, keeping the source username as the key: `python3 generate_remapping.py --username-suffix=-splunk`. Both `apply.py` and `apply_contact_methods_and_policies.py` resolve user references through `remapping.users`, so the suffix cascades to members, rotations, escalation-policy user steps, and deferred user settings. Emails are not suffixed.
+
+**Email addresses:** The `emails` category maps source addresses to target addresses (for example when the target org uses a different email domain). Entries are collected from `users_inventory.json` and escalation-policy email steps in `escalation_policy_details_inventory.json`. Apply uses remapped emails when creating users, building escalation-policy email steps, and posting email contact methods (deferred script). Set a source address to `null` to skip user creation for that address and omit matching escalation steps.
+
+**Alert rule routing keys:** The generator populates `routing_keys` only from `routing_keys_inventory.json`. Rules with `alertField: routing_key` may use pattern match values (for example rotation names) that are not listed as org routing keys. `validate_apply.py` fails if a non-skipped rule references a match value missing from `remapping.routing_keys`. Add the match value under `routing_keys` with the desired target name, or set the rule ID to `null` in `alert_rules` to skip it.
+
+Validate before apply:
+
+```bash
+python3 validate_inventory.py
+python3 validate_apply.py
+```
+
+Note: `validate_apply.py` checks remapping integrity for primary apply resources only — not contact methods or paging policies.
 
 ---
 
@@ -324,22 +353,40 @@ Apply is designed to be **partially idempotent**. If you run `python3 apply.py -
 
 Use a dry run before any repeat apply and compare `inventory/apply_report.json` stats (`created` vs `skipped` vs `failed`). After the first successful apply, keep `apply_report.json` — its `slug_maps` show how source IDs mapped to target slugs for routing keys and policies.
 
-### Remapping
+---
 
-`generate_remapping.py` produces seven categories: `users`, `emails`, `teams`, `routing_keys`, `escalation_policies`, `alert_rules`, `outbound_webhooks`. Output defaults to `inventory/remapping.json`. Set any value to `null` to skip that resource. Re-running the generator overwrites the file.
+## Phase 3b: Deferred user settings
 
-**Usernames:** Usernames are globally unique across the entire Splunk On-Call environment (shared across orgs). By default the generator maps each source username to itself. Pass `--username-suffix=-splunk` (the leading `-` requires the `=` form) to append a suffix to every target username value, keeping the source username as the key: `python3 generate_remapping.py --username-suffix=-splunk`. Apply resolves all user references (members, rotations, admins, escalation-policy user steps) through `remapping.users`, so the suffix cascades everywhere automatically. Emails are not suffixed.
+`apply_contact_methods_and_policies.py` migrates per-user contact methods and primary paging policy steps. Run it **after** `apply.py --apply` has created users in the target org.
 
-**Email addresses:** The `emails` category maps source addresses to target addresses (for example when the target org uses a different email domain). Entries are collected from `users_inventory.json` and escalation-policy email steps in `escalation_policy_details_inventory.json`. Apply uses remapped emails when creating users and when building escalation-policy email steps. Set a source address to `null` to skip user creation for that address and omit matching escalation steps.
+### Prerequisites
 
-**Alert rule routing keys:** The generator populates `routing_keys` only from `routing_keys_inventory.json`. Rules with `alertField: routing_key` may use pattern match values (for example rotation names) that are not listed as org routing keys. `validate_apply.py` fails if a non-skipped rule references a match value missing from `remapping.routing_keys`. Add the match value under `routing_keys` with the desired target name, or set the rule ID to `null` in `alert_rules` to skip it.
+- Target users must already exist (from primary apply).
+- `inventory/contact_methods_inventory.json` and `inventory/paging_policies_inventory.json` from discovery.
+- Same `inventory/remapping.json` as primary apply (username and email remapping).
 
-Validate before apply:
+### Commands
 
 ```bash
-python3 validate_inventory.py
-python3 validate_apply.py
+python3 apply_contact_methods_and_policies.py -h
+python3 apply_contact_methods_and_policies.py              # dry-run (default)
+python3 apply_contact_methods_and_policies.py --apply       # execute writes
 ```
+
+| Step | API | Notes |
+| :--- | :--- | :--- |
+| Email contact methods | `POST /user/{username}/contact-methods/emails` | Remap `value` via `remapping.emails`; skip `null` |
+| Phone contact methods | `POST /user/{username}/contact-methods/phones` | Phone numbers posted as-is |
+| Push devices | — | **Not migrated** — requires user login on target |
+| Paging policy steps | `POST /user/{username}/policies/primary/steps` | Posts `timeout` + `contactType`; push steps typically fail until devices are registered |
+
+Push notification steps (`contactType: push`) are expected to fail when no push device exists on the target user. The script logs a warning and continues.
+
+The script iterates users from `contact_methods_inventory.json`; paging steps for each user come from the matching entry in `paging_policies_inventory.json`.
+
+### Re-running deferred apply
+
+Unlike primary apply, the deferred script has **no duplicate detection**. Re-running `--apply` posts emails, phones, and paging steps again and may fail or create duplicates. Dry-run first and remove conflicting contact methods in the target UI before repeating.
 
 ---
 
@@ -362,6 +409,12 @@ Before apply:
 - [ ] `python3 validate_apply.py` passes
 - [ ] `python3 apply.py` dry-run reviewed
 
+After primary apply (deferred user settings):
+
+- [ ] `python3 apply_contact_methods_and_policies.py` dry-run reviewed (contact methods + paging steps)
+- [ ] `python3 apply_contact_methods_and_policies.py --apply` executed
+- [ ] Push paging steps expected to warn until users register devices on target
+
 After manual capture:
 
 - [ ] Every enabled integration tile has a JSON file in `manual_capture/integrations/`
@@ -375,6 +428,7 @@ After manual capture:
 
 - [`README.md`](../README.md) — quick start, installation, workflow
 - [`VALIDATION_REPORT.md`](VALIDATION_REPORT.md) — post-discovery validation template
+- [`HANDOFF_PROMPT.md`](HANDOFF_PROMPT.md) — copy-paste context for another LLM
 - [`manual_capture/README.md`](../manual_capture/README.md) — integrations, permissions, SSO capture
 - [VictorOps public API docs](https://portal.victorops.com/public/api-docs.html)
 - [Splunk On-Call SSO documentation](https://help.splunk.com/en/splunk-enterprise/alert-and-respond/splunk-on-call/introduction-to-splunk-on-call/single-sign-on)

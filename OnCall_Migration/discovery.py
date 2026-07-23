@@ -431,7 +431,14 @@ class DiscoveryPipeline:
         schedules = self._fetch_schedules(teams_for_fetch)
         overrides = filter_overrides(self.get_scheduled_overrides(), team_slugs)
 
-        usernames = collect_usernames(team_members, rotations, team_slugs)
+        usernames = collect_usernames(
+            team_members,
+            rotations,
+            team_slugs,
+            admins_by_team=team_admins,
+            policy_details=policy_details,
+            policy_slugs=expanded_policies,
+        )
         users = filter_users(all_users, usernames)
         log.info(f"Scoped user set: {len(users)} user(s) from {len(team_slugs)} team(s)")
 

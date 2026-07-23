@@ -49,6 +49,38 @@ class TeamScopeTest(unittest.TestCase):
             {"alice", "bob"},
         )
 
+    def test_collect_usernames_includes_admins(self) -> None:
+        members = {"team-a": {"members": [{"username": "alice"}]}}
+        admins = {"team-a": {"admins": [{"username": "carol"}]}}
+        self.assertEqual(
+            collect_usernames(members, {}, {"team-a"}, admins_by_team=admins),
+            {"alice", "carol"},
+        )
+
+    def test_collect_usernames_includes_policy_user_steps(self) -> None:
+        members = {"team-a": {"members": [{"username": "alice"}]}}
+        details = {
+            "pol-a": [
+                {
+                    "entries": [
+                        {"executionType": "user", "user": {"username": "dave"}},
+                        {"executionType": "email", "email": {"address": "x@example.com"}},
+                    ]
+                }
+            ],
+            "pol-out-of-scope": [
+                {"entries": [{"executionType": "user", "user": {"username": "eve"}}]}
+            ],
+        }
+        result = collect_usernames(
+            members,
+            {},
+            {"team-a"},
+            policy_details=details,
+            policy_slugs={"pol-a"},
+        )
+        self.assertEqual(result, {"alice", "dave"})
+
     def test_expand_policy_closure_transitive(self) -> None:
         details = {
             "pol-a": [

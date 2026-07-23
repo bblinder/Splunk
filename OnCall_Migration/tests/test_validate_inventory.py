@@ -80,6 +80,35 @@ class InventoryValidatorTest(unittest.TestCase):
         validator = InventoryValidator(self.inventory_dir)
         self.assertGreater(validator.validate(), 0)
 
+    def test_validate_fails_on_corrupt_json(self) -> None:
+        (self.inventory_dir / "teams_inventory.json").write_text("{ not valid json")
+
+        validator = InventoryValidator(self.inventory_dir)
+        self.assertGreater(validator.validate(), 0)
+
+    def test_validate_warns_when_user_missing_contact_methods(self) -> None:
+        (self.inventory_dir / "users_inventory.json").write_text(
+            json.dumps([{"username": "alice"}, {"username": "bob"}])
+        )
+        (self.inventory_dir / "contact_methods_inventory.json").write_text(
+            json.dumps({"alice": {"emails": {"contactMethods": []}}})
+        )
+
+        validator = InventoryValidator(self.inventory_dir)
+        validator.validate()
+        self.assertGreater(validator.warnings, 0)
+
+    def test_validate_fails_when_contact_methods_orphan_user(self) -> None:
+        (self.inventory_dir / "users_inventory.json").write_text(
+            json.dumps([{"username": "alice"}])
+        )
+        (self.inventory_dir / "contact_methods_inventory.json").write_text(
+            json.dumps({"ghost": {"emails": {"contactMethods": []}}})
+        )
+
+        validator = InventoryValidator(self.inventory_dir)
+        self.assertGreater(validator.validate(), 0)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -47,6 +47,10 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 log = logging.getLogger(__name__)
 
 
+def post_succeeded(code: int, result: Any = None) -> bool:
+    return code in (200, 201) and result is not None
+
+
 class RemappingContext:
     def __init__(self, remapping: Dict[str, Dict[str, Any]]):
         self.remapping = remapping
@@ -231,7 +235,7 @@ class ApplyPipeline:
                 "email": target_email,
             }
             result, code = self.client.post("user", payload)
-            if code == 200 and result is not None:
+            if post_succeeded(code, result):
                 self._bump("users", "created")
             else:
                 self._bump("users", "failed")
@@ -247,6 +251,44 @@ class ApplyPipeline:
             if isinstance(teams, list):
                 return [t for t in teams if isinstance(t, dict)]
         return []
+
+    def _existing_routing_keys(self) -> Set[str]:
+        data, status = self.client.get("org/routing-keys", allow_404=True)
+        if status != 200:
+            return set()
+        if isinstance(data, list):
+            items = data
+        elif isinstance(data, dict):
+            items = data.get("routingKeys") or []
+        else:
+            items = []
+        return {rk.get("routingKey") for rk in items if isinstance(rk, dict) and rk.get("routingKey")}
+
+    @staticmethod
+    def _alert_rule_signature(alert_field: Any, match_value: Any, rank: Any) -> Tuple[Any, Any, Any]:
+        return (alert_field, match_value, rank)
+
+    def _existing_alert_rule_signatures(self) -> Set[Tuple[Any, Any, Any]]:
+        data, status = self.client.get("alertRules", allow_404=True)
+        if status != 200:
+            return set()
+        if isinstance(data, list):
+            items = data
+        elif isinstance(data, dict):
+            items = data.get("alertRules") or []
+        else:
+            items = []
+        signatures: Set[Tuple[Any, Any, Any]] = set()
+        for rule in items:
+            if isinstance(rule, dict):
+                signatures.add(
+                    self._alert_rule_signature(
+                        rule.get("alertField"),
+                        rule.get("alertValueMatch", ""),
+                        rule.get("rank", 1),
+                    )
+                )
+        return signatures
 
     def apply_teams(self) -> None:
         teams = self._load_json("teams_inventory") or []
@@ -269,7 +311,7 @@ class ApplyPipeline:
             if team.get("description"):
                 payload["description"] = team["description"]
             result, code = self.client.post("team", payload)
-            if code == 200 and result:
+            if post_succeeded(code, result):
                 target_slug = result.get("slug", source_slug)
                 self.team_slug_map[source_slug] = target_slug
                 existing_by_name[name] = target_slug
@@ -305,7 +347,7 @@ class ApplyPipeline:
                         self._bump("members", "skipped")
                         continue
                 result, code = self.client.post(f"team/{target_team}/members", {"username": target_user})
-                if code == 200 and result is not None:
+                if post_succeeded(code, result):
                     self._bump("members", "created")
                 else:
                     self._bump("members", "failed")
@@ -408,7 +450,7 @@ class ApplyPipeline:
                         continue
                 body = self._build_rotation_payload(rotation)
                 result, code = self.client.post(f"teams/{target_team}/rotations", body)
-                if code == 200 and result is not None:
+                if post_succeeded(code, result):
                     self._bump("rotations", "created")
                 else:
                     self._bump("rotations", "failed")
@@ -498,9 +540,13 @@ class ApplyPipeline:
                 self._bump("escalation_policies", "failed")
                 continue
 
-            existing, status = self.client.get(f"policies/{source_slug}", allow_404=True)
+            target_policy_slug = self.remapping.map_value("escalation_policies", source_slug)
+            if not target_policy_slug:
+                self._bump("escalation_policies", "skipped")
+                continue
+            existing, status = self.client.get(f"policies/{target_policy_slug}", allow_404=True)
             if status == 200 and existing:
-                self.policy_slug_map[source_slug] = existing.get("slug", source_slug)
+                self.policy_slug_map[source_slug] = existing.get("slug", target_policy_slug)
                 self._bump("escalation_policies", "skipped")
                 continue
 
@@ -524,14 +570,15 @@ class ApplyPipeline:
                 "steps": steps_out,
             }
             result, code = self.client.post("policies", payload)
-            if code == 200 and result:
-                self.policy_slug_map[source_slug] = result.get("slug", source_slug)
+            if post_succeeded(code, result):
+                self.policy_slug_map[source_slug] = result.get("slug", target_policy_slug)
                 self._bump("escalation_policies", "created")
             else:
                 self._bump("escalation_policies", "failed")
 
     def apply_routing_keys(self) -> None:
         routing_keys = self._load_json("routing_keys_inventory") or []
+        existing_keys = self._existing_routing_keys()
         for rk in routing_keys:
             if not isinstance(rk, dict):
                 continue
@@ -540,6 +587,10 @@ class ApplyPipeline:
                 self._bump("routing_keys", "skipped")
                 continue
             target_name = self.remapping.map_value("routing_keys", source_name)
+            if target_name in existing_keys:
+                log.info(f"  SKIP routing key exists: {target_name}")
+                self._bump("routing_keys", "skipped")
+                continue
             targets = []
             for target in rk.get("targets", []):
                 source_policy = target.get("policySlug")
@@ -553,13 +604,15 @@ class ApplyPipeline:
                 continue
             payload = {"routingKey": target_name, "targets": targets}
             result, code = self.client.post("org/routing-keys", payload)
-            if code == 200 and result is not None:
+            if post_succeeded(code, result):
+                existing_keys.add(target_name)
                 self._bump("routing_keys", "created")
             else:
                 self._bump("routing_keys", "failed")
 
     def apply_alert_rules(self) -> None:
         rules = self._load_json("alert_rules_inventory") or []
+        existing_signatures = self._existing_alert_rule_signatures()
         for rule in rules:
             if not isinstance(rule, dict):
                 continue
@@ -570,18 +623,25 @@ class ApplyPipeline:
             match_value = rule.get("alertValueMatch", "")
             if rule.get("alertField") == "routing_key" and match_value:
                 match_value = self.remapping.map_value("routing_keys", match_value) or match_value
+            rank = rule.get("rank", 1)
+            signature = self._alert_rule_signature(rule.get("alertField"), match_value, rank)
+            if signature in existing_signatures:
+                log.info(f"  SKIP alert rule exists: {signature}")
+                self._bump("alert_rules", "skipped")
+                continue
             payload = {
                 "alertField": rule.get("alertField"),
                 "alertValueMatch": match_value,
                 "matchType": rule.get("matchType", "WILDCARD"),
-                "rank": rule.get("rank", 1),
+                "rank": rank,
                 "stopFlag": rule.get("stopFlag", False),
                 "notes": rule.get("notes", ""),
             }
             if rule.get("annotations"):
                 payload["annotations"] = rule["annotations"]
             result, code = self.client.post("alertRules", payload)
-            if code == 200 and result is not None:
+            if post_succeeded(code, result):
+                existing_signatures.add(signature)
                 self._bump("alert_rules", "created")
             else:
                 self._bump("alert_rules", "failed")
