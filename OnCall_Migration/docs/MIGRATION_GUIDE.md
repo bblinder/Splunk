@@ -77,8 +77,7 @@ OnCall_Migration/
 │   └── team_scope.py
 ├── docs/
 │   ├── MIGRATION_GUIDE.md
-│   ├── VALIDATION_REPORT.md
-│   └── HANDOFF_PROMPT.md
+│   └── VALIDATION_REPORT.md
 ├── tests/
 │   ├── test_discovery.py
 │   ├── test_apply.py
@@ -117,7 +116,7 @@ OnCall_Migration/
 | `utils/migration_types.py` | Shared type aliases (`InventoryCounts`, etc.) |
 | `utils/team_scope.py` | Scoped discovery filtering (team slugs, policy closure, alert/routing-key subset) |
 | `tests/` | Mocked unit tests (no live API calls) |
-| `docs/` | Migration guide, validation template, and LLM handoff prompt |
+| `docs/` | Migration guide and validation template |
 | `inventory/` | API export output and `remapping.json` (gitignored) |
 | `manual_capture/` | Manual capture templates and operator notes (tracked); filled `integrations/*.json` gitignored |
 | `README.md` | Quick start, workflow, scope |
@@ -428,7 +427,6 @@ After manual capture:
 
 - [`README.md`](../README.md) — quick start, installation, workflow
 - [`VALIDATION_REPORT.md`](VALIDATION_REPORT.md) — post-discovery validation template
-- [`HANDOFF_PROMPT.md`](HANDOFF_PROMPT.md) — copy-paste context for another LLM
 - [`manual_capture/README.md`](../manual_capture/README.md) — integrations, permissions, SSO capture
 - [VictorOps public API docs](https://portal.victorops.com/public/api-docs.html)
 - [Splunk On-Call SSO documentation](https://help.splunk.com/en/splunk-enterprise/alert-and-respond/splunk-on-call/introduction-to-splunk-on-call/single-sign-on)

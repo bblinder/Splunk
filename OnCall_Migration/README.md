@@ -27,8 +27,7 @@ OnCall_Migration/
 │   └── team_scope.py
 ├── docs/
 │   ├── MIGRATION_GUIDE.md
-│   ├── VALIDATION_REPORT.md
-│   └── HANDOFF_PROMPT.md
+│   └── VALIDATION_REPORT.md
 ├── tests/
 │   ├── test_discovery.py
 │   ├── test_apply.py
@@ -130,7 +129,6 @@ The migration covers the following core resources:
 ### Documentation
 - **Migration Guide**: [`docs/MIGRATION_GUIDE.md`](docs/MIGRATION_GUIDE.md) (Schema, API notes, checklists, repository layout)
 - **Validation Template**: [`docs/VALIDATION_REPORT.md`](docs/VALIDATION_REPORT.md) (Template for recording results)
-- **Handoff Prompt**: [`docs/HANDOFF_PROMPT.md`](docs/HANDOFF_PROMPT.md) (Copy-paste context for another LLM)
 - **Support modules**: [`utils/`](utils/) — `env_loader`, `io`, `cli`, `http_client`, `rate_limiter`, `exceptions`, `migration_types`, `summary_reporter`, `team_scope`
 
 ## Tests
