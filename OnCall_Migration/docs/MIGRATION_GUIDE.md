@@ -137,7 +137,7 @@ Every pipeline script supports `-h` / `--help` for flags and defaults (e.g. `pyt
 | :--- | :--- | :--- |
 | `discovery.py` | `--inventory`, `--teams`, `--teams-file` | `inventory`; scoped: comma-separated team slugs or file |
 | `validate_inventory.py` | `--inventory` | `inventory` |
-| `generate_remapping.py` | `--inventory`, `--remapping` | `inventory`, `inventory/remapping.json` |
+| `generate_remapping.py` | `--inventory`, `--remapping`, `--username-suffix` | `inventory`, `inventory/remapping.json`, `""` (no suffix) |
 | `validate_apply.py` | `--inventory`, `--remapping` | same |
 | `apply.py` | `--apply`, `--inventory`, `--remapping` | same |
 
@@ -327,6 +327,8 @@ Use a dry run before any repeat apply and compare `inventory/apply_report.json` 
 ### Remapping
 
 `generate_remapping.py` produces seven categories: `users`, `emails`, `teams`, `routing_keys`, `escalation_policies`, `alert_rules`, `outbound_webhooks`. Output defaults to `inventory/remapping.json`. Set any value to `null` to skip that resource. Re-running the generator overwrites the file.
+
+**Usernames:** Usernames are globally unique across the entire Splunk On-Call environment (shared across orgs). By default the generator maps each source username to itself. Pass `--username-suffix=-aven` (the leading `-` requires the `=` form) to append a suffix to every target username value, keeping the source username as the key: `python3 generate_remapping.py --username-suffix=-aven`. Apply resolves all user references (members, rotations, admins, escalation-policy user steps) through `remapping.users`, so the suffix cascades everywhere automatically. Emails are not suffixed.
 
 **Email addresses:** The `emails` category maps source addresses to target addresses (for example when the target org uses a different email domain). Entries are collected from `users_inventory.json` and escalation-policy email steps in `escalation_policy_details_inventory.json`. Apply uses remapped emails when creating users and when building escalation-policy email steps. Set a source address to `null` to skip user creation for that address and omit matching escalation steps.
 

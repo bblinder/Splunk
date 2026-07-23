@@ -90,6 +90,7 @@ Follow these steps in order to migrate your Splunk On-Call configuration:
 3. **Remapping**: Generate a template for mapping source IDs to target names/slugs.
    `python3 generate_remapping.py`
    *Note: Edit `inventory/remapping.json` manually if needed. **Set values to `null` to skip resources**. Remap email addresses under `emails` when the target org uses different domains. Alert rules that match routing-key patterns may reference values not in `routing_keys_inventory`; add those keys to `remapping.json` manually or set the rule ID to `null` to skip.*
+   *Usernames are globally unique across Splunk On-Call. Pass `--username-suffix=-aven` to append a suffix to every target username (default: no suffix): `python3 generate_remapping.py --username-suffix=-aven`.*
 4. **Pre-flight**: Validate the remapping logic before executing against the target.
    `python3 validate_apply.py`
 5. **Dry Run**: Perform a simulated application of changes (no writes).
@@ -97,7 +98,7 @@ Follow these steps in order to migrate your Splunk On-Call configuration:
 6. **Apply**: Execute the migration to the target organization.
    `python3 apply.py --apply`
 
-Optional path flags: `--inventory` (default `inventory`), `--remapping` (default `inventory/remapping.json`) on `generate_remapping.py`, `validate_apply.py`, and `apply.py`; `--inventory` on `discovery.py` and `validate_inventory.py`; `--teams` / `--teams-file` on `discovery.py` for scoped exports. See the Migration Guide CLI reference.
+Optional path flags: `--inventory` (default `inventory`), `--remapping` (default `inventory/remapping.json`) on `generate_remapping.py`, `validate_apply.py`, and `apply.py`; `--username-suffix` (default empty) on `generate_remapping.py`; `--inventory` on `discovery.py` and `validate_inventory.py`; `--teams` / `--teams-file` on `discovery.py` for scoped exports. See the Migration Guide CLI reference.
 
 All pipeline scripts accept `-h` / `--help` for flags and defaults. See [`docs/MIGRATION_GUIDE.md`](docs/MIGRATION_GUIDE.md) for more detailed information on CLI/flags options.
 

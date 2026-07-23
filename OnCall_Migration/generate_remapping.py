@@ -28,6 +28,11 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--inventory", default="inventory", help="Inventory directory path.")
     parser.add_argument("--remapping", default="inventory/remapping.json", help="Remapping output file path.")
+    parser.add_argument(
+        "--username-suffix",
+        default="",
+        help="Suffix appended to target usernames for global uniqueness (e.g. --username-suffix=-splunk).",
+    )
     return parser
 
 
@@ -38,9 +43,10 @@ if __name__ == "__main__":
 class RemappingGenerator:
     """Generates a remapping.json template from the discovery inventory."""
 
-    def __init__(self, inventory_dir: Path, output_file: Path):
+    def __init__(self, inventory_dir: Path, output_file: Path, username_suffix: str = ""):
         self.inventory_dir = inventory_dir
         self.output_file = output_file
+        self.username_suffix = username_suffix
 
     def _load_json(self, filename: str) -> Any:
         return load_json(self.inventory_dir / filename, default=[], logger=log)
@@ -88,7 +94,7 @@ class RemappingGenerator:
         users = self._load_json("users_inventory.json")
         for u in users:
             if isinstance(u, dict) and "username" in u:
-                remapping["users"][u["username"]] = u["username"]
+                remapping["users"][u["username"]] = f"{u['username']}{self.username_suffix}"
 
         policy_details = self._load_json("escalation_policy_details_inventory.json")
         remapping["emails"] = self._collect_emails(users, policy_details)
@@ -144,7 +150,7 @@ class RemappingGenerator:
 def main(argv: list[str] | None = None) -> None:
     args = _build_arg_parser().parse_args(argv)
 
-    generator = RemappingGenerator(Path(args.inventory), Path(args.remapping))
+    generator = RemappingGenerator(Path(args.inventory), Path(args.remapping), args.username_suffix)
     generator.generate()
 
 

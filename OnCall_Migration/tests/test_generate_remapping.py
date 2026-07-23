@@ -64,6 +64,13 @@ class RemappingGeneratorTest(unittest.TestCase):
         self.assertEqual(result["outbound_webhooks"]["wh-test"], "wh-test")
         self.assertTrue(self.output_file.exists())
 
+    def test_username_suffix_appended_to_target(self) -> None:
+        generator = RemappingGenerator(self.inventory_dir, self.output_file, username_suffix="-aven")
+        result = generator.generate()
+
+        self.assertEqual(result["users"]["alice"], "alice-aven")
+        self.assertEqual(result["emails"]["alice@example.com"], "alice@example.com")
+
 
 if __name__ == "__main__":
     unittest.main()
