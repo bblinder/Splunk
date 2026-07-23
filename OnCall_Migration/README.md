@@ -90,7 +90,7 @@ Follow these steps in order to migrate your Splunk On-Call configuration:
 3. **Remapping**: Generate a template for mapping source IDs to target names/slugs.
    `python3 generate_remapping.py`
    *Note: Edit `inventory/remapping.json` manually if needed. **Set values to `null` to skip resources**. Remap email addresses under `emails` when the target org uses different domains. Alert rules that match routing-key patterns may reference values not in `routing_keys_inventory`; add those keys to `remapping.json` manually or set the rule ID to `null` to skip.*
-   *Usernames are globally unique across Splunk On-Call. Pass `--username-suffix=-aven` to append a suffix to every target username (default: no suffix): `python3 generate_remapping.py --username-suffix=-aven`.*
+   *Usernames are globally unique across Splunk On-Call. Pass `--username-suffix=-splunk` to append a suffix to every target username (default: no suffix): `python3 generate_remapping.py --username-suffix=-splunk`.*
 4. **Pre-flight**: Validate the remapping logic before executing against the target.
    `python3 validate_apply.py`
 5. **Dry Run**: Perform a simulated application of changes (no writes).
