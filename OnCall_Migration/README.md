@@ -57,7 +57,7 @@ Paths marked **gitignored** (`inventory/`, `.env`, `discovery_run.log`, filled `
 
 ### Installation
 
-You can install dependencies using either standard `venv` or `[uv](https://docs.astral.sh/uv/)`.
+You can install dependencies using either standard `venv` or [uv](https://docs.astral.sh/uv/).
 
 ```bash
 # Option A: venv + pip
@@ -121,7 +121,7 @@ Follow these steps in order to migrate your Splunk On-Call configuration:
 
 Optional path flags: `--inventory` (default `inventory`), `--remapping` (default `inventory/remapping.json`) on `generate_remapping.py`, `validate_apply.py`, `apply.py`, and `apply_contact_methods_and_policies.py`; `--username-suffix` (default empty) on `generate_remapping.py`; `--inventory` on `discovery.py` and `validate_inventory.py`; `--teams` / `--teams-file` on `discovery.py` for scoped exports. See the Migration Guide CLI reference.
 
-All pipeline scripts accept `-h` / `--help` for flags and defaults. See `[docs/MIGRATION_GUIDE.md](docs/MIGRATION_GUIDE.md)` for more detailed information on CLI/flags options.
+All pipeline scripts accept `-h` / `--help` for flags and defaults. See [`docs/MIGRATION_GUIDE.md`](docs/MIGRATION_GUIDE.md) for more detailed information on CLI/flags options.
 
 **uv:** Prefix commands with `uv run`. Without a venv: `uv run --with requests python3 <script>.py`.
 

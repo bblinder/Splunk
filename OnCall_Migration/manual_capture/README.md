@@ -2,7 +2,7 @@
 
 Splunk On-Call has no public API for listing integrations, global user permissions, or org SSO settings. Capture these from the portal and your identity provider after discovery completes.
 
-See `[docs/MIGRATION_GUIDE.md](../docs/MIGRATION_GUIDE.md)` (Phase 2) for workflow context.
+See [docs/MIGRATION_GUIDE.md](../docs/MIGRATION_GUIDE.md) (Phase 2) for workflow context.
 
 ## Security
 
@@ -29,7 +29,7 @@ For each enabled integration tile:
 2. Fill in non-secret settings (name, type, enabled state, portal path, configuration fields visible in the UI).
 3. Put credentials in your vault; set `secrets_vault_reference` to the vault path only.
 4. Cross-reference `inventory/alert_rules_inventory.json` and `inventory/outbound_webhooks_inventory.json` for related automation (do not duplicate secrets from those files).
-5. Add an entry to the `integrations` array in `[capture_status.json](capture_status.json)`.
+5. Add an entry to the `integrations` array in [capture_status.json](capture_status.json).
 
 Common integration types: ServiceNow, Slack, REST/Generic, outbound webhooks.
 
@@ -37,7 +37,7 @@ Common integration types: ServiceNow, Slack, REST/Generic, outbound webhooks.
 
 **Source:** Splunk On-Call portal → **Settings** → **Organization** → **Users**
 
-Fill in `[user_permissions/admin_users.md](user_permissions/admin_users.md)`:
+Fill in [user_permissions/admin_users.md](user_permissions/admin_users.md):
 
 - Global org admins (not exportable via API)
 - Team admins — spot-check against `inventory/team_admins_inventory.json`
@@ -49,7 +49,7 @@ Fill in `[user_permissions/admin_users.md](user_permissions/admin_users.md)`:
 
 **Source:** Identity provider admin console (not the Splunk On-Call portal)
 
-Fill in `[sso/idp_config.md](sso/idp_config.md)`:
+Fill in [sso/idp_config.md](sso/idp_config.md):
 
 - IdP application settings (entity ID, ACS URL, attribute mappings)
 - Splunk On-Call standard constants (below)
@@ -67,7 +67,7 @@ SSO backend configuration in Splunk On-Call is coordinated with Splunk support; 
 
 ### 4. Update status tracker
 
-Edit `[capture_status.json](capture_status.json)`:
+Edit [capture_status.json](capture_status.json):
 
 - Set each category to `pending`, `in_progress`, or `complete`
 - Set `updated_at` when you finish a review pass
@@ -90,7 +90,7 @@ Before source org access ends:
 
 ## Related documentation
 
-- `[docs/MIGRATION_GUIDE.md](../docs/MIGRATION_GUIDE.md)` — full migration workflow
-- `[docs/VALIDATION_REPORT.md](../docs/VALIDATION_REPORT.md)` — post-discovery validation template
-- `[docs/TROUBLESHOOTING.md](../docs/TROUBLESHOOTING.md)` — apply failures and edge cases
+- [docs/MIGRATION_GUIDE.md](../docs/MIGRATION_GUIDE.md) — full migration workflow
+- [docs/VALIDATION_REPORT.md](../docs/VALIDATION_REPORT.md) — post-discovery validation template
+- [docs/TROUBLESHOOTING.md](../docs/TROUBLESHOOTING.md) — apply failures and edge cases
 

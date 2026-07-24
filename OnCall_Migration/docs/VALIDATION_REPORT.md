@@ -144,7 +144,7 @@ Manual review after automated checks pass:
 
 These cannot be exported via the public API:
 
-1. **Integrations** — capture manually; see `[manual_capture/README.md](../manual_capture/README.md)`
+1. **Integrations** — capture manually; see [`manual_capture/README.md`](../manual_capture/README.md)
 2. **Global user permissions** — org admin / stakeholder roles not listable via API
 3. **SSO / org auth settings** — document from identity provider
 

@@ -305,7 +305,7 @@ covered by any apply script:
 
 ## Related documentation
 
-- `[MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)` — full workflow, CLI reference, checklists
-- `[VALIDATION_REPORT.md](VALIDATION_REPORT.md)` — post-discovery validation template
-- `[manual_capture/README.md](../manual_capture/README.md)` — integrations, permissions, SSO capture
+- [`MIGRATION_GUIDE.md`](MIGRATION_GUIDE.md) — full workflow, CLI reference, checklists
+- [`VALIDATION_REPORT.md`](VALIDATION_REPORT.md) — post-discovery validation template
+- [`manual_capture/README.md`](../manual_capture/README.md) — integrations, permissions, SSO capture
 
