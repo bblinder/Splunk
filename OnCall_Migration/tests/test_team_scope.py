@@ -24,8 +24,8 @@ class TeamScopeTest(unittest.TestCase):
     def test_parse_teams_file_skips_comments_and_blanks(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "teams.txt"
-            path.write_text("# header\nsabre-a\n\n# another\nsabre-b\n")
-            self.assertEqual(parse_teams_file(path), ["sabre-a", "sabre-b"])
+            path.write_text("# header\nteam-one\n\n# another\nteam-two\n")
+            self.assertEqual(parse_teams_file(path), ["team-one", "team-two"])
 
     def test_unknown_team_slugs(self) -> None:
         teams = [{"slug": "team-a", "name": "A"}, {"slug": "team-b", "name": "B"}]

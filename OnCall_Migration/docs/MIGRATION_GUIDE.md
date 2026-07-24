@@ -39,6 +39,7 @@ Terraform was evaluated and rejected for the apply step: the `splunk/victorops` 
 - **Escalation policies cannot be edited later:** Once created in the target org, policy steps and routing cannot be changed through the API. Double-check `inventory/remapping.json` and run `python3 validate_apply.py` before applying.
 - **Re-running apply:** A second run is mostly safe for resources that already exist — users, teams, members, rotations, and escalation policies are skipped when found. Routing keys and alert rules are posted again and may fail or duplicate if they already exist. A policy created with wrong steps cannot be fixed by re-applying; fix it in the target UI or delete and recreate the policy manually, then adjust remapping if needed. Re-running `apply_contact_methods_and_policies.py --apply` skips existing emails, phones, and matching paging steps via GET preflight; duplicate contact POSTs otherwise return HTTP 500 from the API.
 - **Overwrites:** Re-running `generate_remapping.py` overwrites `inventory/remapping.json`. Back up manual edits first.
+- **Troubleshooting:** For apply failures and known edge cases (cascade failures, user 409 conflicts, non-member rotation refs, deferring users, idempotency), see [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
 ### Scope
 
