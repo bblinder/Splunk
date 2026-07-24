@@ -412,6 +412,41 @@ class ApplyPipelineTest(unittest.TestCase):
         self.client.post_once.assert_not_called()
         self.assertEqual(self.pipeline.stats["rotations"]["skipped"], 2)
 
+    def test_escalation_policy_fails_when_rotation_unmapped(self) -> None:
+        self.client.dry_run = False
+        self.pipeline.rtg_slug_map = {}
+
+        def fake_get(url, timeout=30):
+            if "/policies/pol-alpha" in url:
+                return FakeResponse({}, status_code=404)
+            return FakeResponse({}, status_code=404)
+
+        self.client.session.get = mock.MagicMock(side_effect=fake_get)
+        self.client.session.post = mock.MagicMock()
+
+        with mock.patch.object(self.client.rate_limiter, "wait"):
+            self.pipeline._index_policy_metadata()
+            self.pipeline.apply_escalation_policies()
+
+        self.client.session.post.assert_not_called()
+        self.assertEqual(self.pipeline.stats["escalation_policies"]["failed"], 1)
+        self.assertIn("pol-alpha", self.pipeline.failures.get("escalation_policies", []))
+
+    def test_routing_key_skips_when_policy_unmapped(self) -> None:
+        self.client.dry_run = False
+        self.pipeline.policy_slug_map = {}
+
+        self.client.session.get = mock.MagicMock(
+            return_value=FakeResponse({"routingKeys": []}, status_code=200)
+        )
+        self.client.session.post = mock.MagicMock()
+
+        with mock.patch.object(self.client.rate_limiter, "wait"):
+            self.pipeline.apply_routing_keys()
+
+        self.client.session.post.assert_not_called()
+        self.assertEqual(self.pipeline.stats["routing_keys"]["skipped"], 1)
+
 
 class ApplyMainEnvTest(unittest.TestCase):
     def test_main_exits_when_target_env_missing(self) -> None:

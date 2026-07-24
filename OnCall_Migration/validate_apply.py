@@ -74,6 +74,7 @@ class PreFlightValidator:
         self._validate_policy_teams(remapping)
         self._validate_team_members(remapping)
         self._validate_team_admins(remapping)
+        self._validate_rotation_user_refs(remapping)
         self._validate_alert_rules(remapping)
 
         log.info("-" * 40)
@@ -292,6 +293,48 @@ class PreFlightValidator:
                         f"[{label}] Team '{team_slug}' references user '{username}' "
                         "which is marked to be SKIPPED (apply excludes them at runtime)."
                     )
+
+    def _validate_rotation_user_refs(self, remapping: Dict[str, Any]) -> None:
+        log.info("Validating rotation shift member user references...")
+        rotations_by_team = self._load_json(self.inventory_dir / "rotation_definitions_inventory.json") or {}
+        mapped_teams = remapping.get("teams", {})
+        mapped_users = remapping.get("users", {})
+
+        if not isinstance(rotations_by_team, dict):
+            return
+
+        for team_slug, payload in rotations_by_team.items():
+            if self._is_skipped(mapped_teams, team_slug):
+                continue
+            if not isinstance(payload, dict):
+                continue
+            for rotation in payload.get("rotations", []):
+                if not isinstance(rotation, dict):
+                    continue
+                rotation_label = rotation.get("label", "")
+                for shift in rotation.get("shifts", []):
+                    if not isinstance(shift, dict):
+                        continue
+                    shift_label = shift.get("label", "shift")
+                    for member in shift.get("shiftMembers", []):
+                        if not isinstance(member, dict):
+                            continue
+                        username = member.get("username")
+                        if not username:
+                            continue
+                        if username not in mapped_users:
+                            self.errors += 1
+                            log.error(
+                                f"[rotations] Rotation '{rotation_label}' shift '{shift_label}' "
+                                f"references user '{username}' which is missing from remapping.json."
+                            )
+                        elif mapped_users[username] is None:
+                            self.warnings += 1
+                            log.warning(
+                                f"[rotations] Rotation '{rotation_label}' shift '{shift_label}' "
+                                f"references user '{username}' which is marked to be SKIPPED "
+                                "(apply excludes them at runtime)."
+                            )
 
     def _validate_alert_rules(self, remapping: Dict[str, Any]) -> None:
         alert_rules = remapping.get("alert_rules")

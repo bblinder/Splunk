@@ -129,6 +129,30 @@ class PreFlightValidatorTest(unittest.TestCase):
         self.assertGreater(validator.warnings, 0)
         self.assertEqual(validator.errors, 0)
 
+    def test_validate_rotation_user_refs(self) -> None:
+        (self.inventory_dir / "rotation_definitions_inventory.json").write_text(
+            json.dumps(
+                {
+                    "team-alpha": {
+                        "rotations": [
+                            {
+                                "label": "Primary",
+                                "shifts": [
+                                    {
+                                        "label": "Day",
+                                        "shiftMembers": [{"username": "alice"}],
+                                    }
+                                ],
+                            }
+                        ]
+                    }
+                }
+            )
+        )
+
+        validator = PreFlightValidator(self.inventory_dir, self.remapping_file)
+        self.assertEqual(validator.validate(), 0)
+
     def test_validate_errors_when_user_missing_from_remapping(self) -> None:
         # A user whose email is not mapped and who is absent from remapping.users
         # must NOT be treated as skipped (aligns with RemappingContext semantics),

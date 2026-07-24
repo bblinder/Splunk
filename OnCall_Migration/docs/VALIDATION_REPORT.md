@@ -198,6 +198,8 @@ Record results after re-enabling SHS in remapping and re-running apply. Customer
 | Skip empty shifts / rotation groups | `apply.py` | Avoids invalid rotation POST bodies (e.g. empty `SRE Distribution`) |
 | `post_once` for rotations | `apply.py` | Logs API error body once (no urllib3 500 retry storm) |
 | `failures` in apply report | `apply.py` | Lists failed usernames / rotations for post-mortem |
+| Cascade guards | `apply.py` | Skip policy/routing-key POST when rotation groups or policies not mapped on target |
+| Rotation shiftMembers check | `validate_apply.py` | Warns on skipped users in rotation shifts (no API calls) |
 
 ### Remapping
 
@@ -248,6 +250,38 @@ Re-run `apply.py --apply` and inspect logs for `FAILED user create` and `apply_r
 | Scheduled overrides (11 active) | `scheduled_overrides_inventory.json` | Recreate in target UI from inventory |
 | Push/mobile devices | `contact_methods_inventory.json` | Users re-login on target app |
 | Integrations / SSO | `manual_capture/` | Per `manual_capture/README.md` |
+
+### Live apply cascade (Managers rotation 500 → policy/routing-key 400)
+
+If `--apply` shows **Managers rotation HTTP 500**, then **Invalid rotation group slug** on policies and **Invalid policy slugs** on routing keys, that is one failure chain — not three separate bugs.
+
+```mermaid
+flowchart TD
+    Rot500["Managers rotation POST HTTP 500"]
+    RtgMapEmpty["rtg_slug_map empty for SHS"]
+    Pol400["Policy POST 400"]
+    Rk400["Routing key POST 400"]
+    Rot500 --> RtgMapEmpty
+    RtgMapEmpty --> Pol400
+    Pol400 --> Rk400
+```
+
+**Fix order:**
+
+1. Capture the 500 response body from logs (`post_once` logs `resp.text`). Synced code also logs the rotation POST payload on failure.
+2. On target **avenhospitality**, verify rotation users exist and are SHS team members:
+   - `GET /user/libugeorge` (remapped from `libu.george`, no `-aven` suffix)
+   - `GET /team/team-pAZi8hj16tndsTnT/members` — confirm Managers `shiftMembers` target usernames
+3. Re-run `apply.py --apply` with `--inventory inventory_new --remapping inventory_new/remapping.json`
+4. If Managers still 500 with all users present: hybrid fallback — POST one shift (EMEA) or create rotation shell in target UI
+
+**Pending repo hardening** (pull latest or apply manually in `apply.py`):
+
+- Do not POST policies when a referenced rotation group is missing from `rtg_slug_map` — **implemented**
+- Do not POST routing keys when target policy is missing from `policy_slug_map` — **implemented**
+- Log rotation POST JSON payload on HTTP failure — **implemented**
+
+After rotations succeed, expect `slug_maps.rotation_groups` populated, then policies and routing keys should apply on the next run.
 
 ---
 

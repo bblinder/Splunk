@@ -497,6 +497,7 @@ class ApplyPipeline:
                     log.error(
                         f"  FAILED rotation '{label}' on team {target_team} (HTTP {code})"
                     )
+                    log.error(f"  Rotation POST payload: {json.dumps(body)[:4000]}")
                     self._record_failure("rotations", f"{label}@{target_team}")
                     self._bump("rotations", "failed")
             self._refresh_rtg_map_for_team(source_team, target_team)
@@ -511,7 +512,16 @@ class ApplyPipeline:
         if execution_type in ("rotation_group", "rotation_group_next", "rotation_group_previous"):
             rg = entry.get("rotationGroup", {})
             source_slug = rg.get("slug")
-            target_slug = self.rtg_slug_map.get(source_slug, source_slug)
+            if not source_slug:
+                return None
+            target_slug = self.rtg_slug_map.get(source_slug)
+            if not target_slug:
+                log.error(
+                    f"  Skipping rotation_group entry: source rotation '{source_slug}' "
+                    f"({rg.get('label', '')}) is not mapped on target — apply rotations first."
+                )
+                self._bump("escalation_policies", "warned")
+                return None
             transformed["rotationGroup"] = {"slug": target_slug}
         elif execution_type == "user":
             user = entry.get("user", {})
@@ -529,9 +539,17 @@ class ApplyPipeline:
         elif execution_type == "policy_routing":
             target = entry.get("targetPolicy", {})
             source_policy = target.get("policySlug")
-            transformed["targetPolicy"] = {
-                "policySlug": self.policy_slug_map.get(source_policy, source_policy)
-            }
+            if not source_policy:
+                return None
+            target_policy = self.policy_slug_map.get(source_policy)
+            if not target_policy:
+                log.error(
+                    f"  Skipping policy_routing entry: source policy '{source_policy}' "
+                    "is not on target — apply escalation policies first."
+                )
+                self._bump("escalation_policies", "warned")
+                return None
+            transformed["targetPolicy"] = {"policySlug": target_policy}
         else:
             return None
         return transformed
@@ -555,6 +573,25 @@ class ApplyPipeline:
             ordered.extend(ready)
             remaining -= set(ready)
         return ordered
+
+    def _policy_rotation_groups_mapped(self, source_slug: str, details: Dict[str, Any]) -> bool:
+        for step in details.get(source_slug, []) or []:
+            for entry in step.get("entries", []):
+                if entry.get("executionType") not in (
+                    "rotation_group",
+                    "rotation_group_next",
+                    "rotation_group_previous",
+                ):
+                    continue
+                source_rtg = entry.get("rotationGroup", {}).get("slug")
+                if source_rtg and source_rtg not in self.rtg_slug_map:
+                    label = entry.get("rotationGroup", {}).get("label", "")
+                    log.error(
+                        f"  Cannot apply policy '{source_slug}': rotation group "
+                        f"'{source_rtg}' ({label}) not mapped on target — apply rotations first."
+                    )
+                    return False
+        return True
 
     def apply_escalation_policies(self) -> None:
         grouped = self._load_json("escalation_policies_inventory") or {}
@@ -593,6 +630,11 @@ class ApplyPipeline:
             if status == 200 and existing:
                 self.policy_slug_map[source_slug] = existing.get("slug", target_policy_slug)
                 self._bump("escalation_policies", "skipped")
+                continue
+
+            if not self._policy_rotation_groups_mapped(source_slug, details):
+                self._record_failure("escalation_policies", source_slug)
+                self._bump("escalation_policies", "failed")
                 continue
 
             steps_out = []
@@ -642,9 +684,20 @@ class ApplyPipeline:
                 if not source_policy:
                     url = target.get("policyUrl") or target.get("_policyUrl") or ""
                     source_policy = url.rstrip("/").split("/")[-1] if url else ""
-                if source_policy and not self.remapping.is_skipped("escalation_policies", source_policy):
-                    targets.append(self.policy_slug_map.get(source_policy, source_policy))
+                if not source_policy or self.remapping.is_skipped("escalation_policies", source_policy):
+                    continue
+                target_policy = self.policy_slug_map.get(source_policy)
+                if not target_policy:
+                    log.error(
+                        f"  Routing key '{target_name}' targets policy '{source_policy}' "
+                        "which is not on target — apply escalation policies first."
+                    )
+                    continue
+                targets.append(target_policy)
             if not targets:
+                log.warning(
+                    f"  Skipping routing key '{target_name}': no target policies available."
+                )
                 self._bump("routing_keys", "skipped")
                 continue
             payload = {"routingKey": target_name, "targets": targets}
