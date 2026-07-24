@@ -8,7 +8,7 @@ Use this document after each `discovery.py` run to record validation results. Co
 - `discovery_run.log` — HTTP errors and warnings
 - `inventory/*.json` — exported configuration
 
-Automated regression coverage: `[tests/](../tests/)` — includes `test_discovery.py`, `test_summary_reporter.py`, `test_rate_limiter.py`, and other pipeline tests.
+Automated regression coverage: [`tests/`](../tests/) — 13 test modules (~84 tests), including `test_discovery.py`, `test_apply.py`, `test_validate_apply.py`, and other pipeline tests.
 
 ---
 
@@ -156,9 +156,11 @@ Some teams may have no escalation policies — that is expected when teams exist
 
 ## Before apply
 
-After remapping is ready, run `python3 validate_apply.py` before any apply dry run. It checks remapping format and relational integrity against inventory.
+After remapping is ready, run `python3 validate_apply.py` before any apply dry run. It checks remapping format and relational integrity against inventory. Skipped users (`null` in remapping) on active teams or in rotation shift members produce **warnings**, not errors.
 
 Alert rules with `alertField: routing_key` may match pattern values not exported in `routing_keys_inventory.json`. If validation reports a missing routing key for a rule, add the match value under `routing_keys` in `remapping.json` or set the rule ID to `null` in `alert_rules` to skip it.
+
+If apply fails, see [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md).
 
 ---
 

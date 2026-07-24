@@ -26,8 +26,9 @@ OnCall_Migration/
 │   ├── summary_reporter.py
 │   └── team_scope.py
 ├── docs/
-│   ├── MIGRATION_GUIDE.md
-│   └── VALIDATION_REPORT.md
+│   ├── MIGRATION_GUIDE.md        # deep reference
+│   ├── VALIDATION_REPORT.md      # post-discovery template
+│   └── TROUBLESHOOTING.md        # apply failures and edge cases
 ├── tests/
 │   ├── test_discovery.py
 │   ├── test_apply.py
@@ -134,6 +135,8 @@ All pipeline scripts accept `-h` / `--help` for flags and defaults. See `[docs/M
 
 - **Overwrites:** Running `generate_remapping.py` overwrites `inventory/remapping.json`. Back up any manual edits before re-running.
 
+- **Troubleshooting:** For apply failures and known edge cases (cascade failures, user 409 conflicts, deferring users, idempotency), see [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md).
+
 
 
 ## Scope & Reference
@@ -159,13 +162,16 @@ The migration covers the following core resources:
 
 ### Documentation
 
-- **Migration Guide**: `[docs/MIGRATION_GUIDE.md](docs/MIGRATION_GUIDE.md)` (Schema, API notes, checklists, repository layout)
-- **Validation Template**: `[docs/VALIDATION_REPORT.md](docs/VALIDATION_REPORT.md)` (Template for recording results)
-- **Support modules**: `[utils/](utils/)` — `env_loader`, `io`, `cli`, `http_client`, `rate_limiter`, `exceptions`, `migration_types`, `summary_reporter`, `team_scope`
+- **Migration Guide**: [`docs/MIGRATION_GUIDE.md`](docs/MIGRATION_GUIDE.md) (schema, API notes, checklists, repository layout)
+- **Validation Template**: [`docs/VALIDATION_REPORT.md`](docs/VALIDATION_REPORT.md) (template for recording discovery results)
+- **Troubleshooting**: [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) (apply failures, cascade errors, deferring users)
+- **Support modules**: [`utils/`](utils/) — `env_loader`, `io`, `cli`, `http_client`, `rate_limiter`, `exceptions`, `migration_types`, `summary_reporter`, `team_scope`
 
 
 
 ## Tests
+
+13 test modules (~84 tests), mocked unit tests (no live API):
 
 ```bash
 python3 -m unittest discover -s tests -t . -v

@@ -82,3 +82,4 @@ Before source org access ends:
 
 - [`docs/MIGRATION_GUIDE.md`](../docs/MIGRATION_GUIDE.md) — full migration workflow
 - [`docs/VALIDATION_REPORT.md`](../docs/VALIDATION_REPORT.md) — post-discovery validation template
+- [`docs/TROUBLESHOOTING.md`](../docs/TROUBLESHOOTING.md) — apply failures and edge cases

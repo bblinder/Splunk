@@ -1,6 +1,6 @@
 # Splunk On-Call Migration Guide
 
-Deep reference for exporting and migrating Splunk On-Call (VictorOps) configuration. For installation, credentials, and step-by-step commands, start with [`README.md`](../README.md). After discovery, optionally record results using [`VALIDATION_REPORT.md`](VALIDATION_REPORT.md).
+Deep reference for exporting and migrating Splunk On-Call (VictorOps) configuration. For installation, credentials, and step-by-step commands, start with [`README.md`](../README.md). After discovery, optionally record results using [`VALIDATION_REPORT.md`](VALIDATION_REPORT.md). For apply failures and edge cases, see [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md).
 
 ---
 
@@ -77,8 +77,9 @@ OnCall_Migration/
 │   ├── summary_reporter.py
 │   └── team_scope.py
 ├── docs/
-│   ├── MIGRATION_GUIDE.md
-│   └── VALIDATION_REPORT.md
+│   ├── MIGRATION_GUIDE.md        # this file
+│   ├── VALIDATION_REPORT.md      # post-discovery template
+│   └── TROUBLESHOOTING.md        # apply failures and edge cases
 ├── tests/
 │   ├── test_discovery.py
 │   ├── test_apply.py
@@ -116,8 +117,8 @@ OnCall_Migration/
 | `utils/exceptions.py` | `MigrationError`, `NetworkError`, `ApiError` |
 | `utils/migration_types.py` | Shared type aliases (`InventoryCounts`, etc.) |
 | `utils/team_scope.py` | Scoped discovery filtering (team slugs, policy closure, alert/routing-key subset) |
-| `tests/` | Mocked unit tests (no live API calls) |
-| `docs/` | Migration guide and validation template |
+| `tests/` | Mocked unit tests (~84 tests across 13 modules; no live API calls) |
+| `docs/` | Migration guide, validation template, troubleshooting |
 | `inventory/` | API export output and `remapping.json` (gitignored) |
 | `manual_capture/` | Manual capture templates and operator notes (tracked); filled `integrations/*.json` gitignored |
 | `README.md` | Quick start, workflow, scope |
@@ -281,7 +282,7 @@ python3 validate_inventory.py
 python3 validate_apply.py
 ```
 
-Note: `validate_apply.py` checks remapping integrity for primary apply resources only — not contact methods or paging policies.
+Note: `validate_apply.py` checks remapping integrity for primary apply resources only — not contact methods or paging policies. Skipped users (`null` in remapping) on active teams or in rotation shift members produce **warnings**, not errors.
 
 ---
 
@@ -312,7 +313,9 @@ python3 apply.py --inventory inventory --remapping inventory/remapping.json
 | `--inventory` | `inventory` | Inventory directory path |
 | `--remapping` | `inventory/remapping.json` | Remapping file path |
 
-Apply report is written to `{inventory}/apply_report.json`.
+Apply report is written to `{inventory}/apply_report.json` (includes stats and a `failures` block for post-mortem).
+
+For rotation 500 → policy 400 → routing-key 400 cascade failures, user 409 email conflicts, and deferring users via `null`, see [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md).
 
 ### Apply order
 
@@ -351,7 +354,7 @@ Apply is designed to be **partially idempotent**. If you run `python3 apply.py -
 | Routing keys | Posted again (no duplicate check) | May error or duplicate; clean up in target UI before re-running |
 | Alert rules | Posted again (no duplicate check) | May error or duplicate; remove conflicting rules in target UI first |
 
-Use a dry run before any repeat apply and compare `inventory/apply_report.json` stats (`created` vs `skipped` vs `failed`). After the first successful apply, keep `apply_report.json` — its `slug_maps` show how source IDs mapped to target slugs for routing keys and policies.
+Use a dry run before any repeat apply and compare `inventory/apply_report.json` stats (`created` vs `skipped` vs `failed`) and the `failures` block. After the first successful apply, keep `apply_report.json` — its `slug_maps` show how source IDs mapped to target slugs for routing keys and policies.
 
 ---
 
@@ -406,8 +409,9 @@ Before apply:
 
 - [ ] `python3 generate_remapping.py` run (or `inventory/remapping.json` manually maintained)
 - [ ] Alert-rule routing key match values are present in `remapping.json` or the rule ID is set to `null`
-- [ ] `python3 validate_apply.py` passes
+- [ ] `python3 validate_apply.py` passes (warnings for skipped users are OK)
 - [ ] `python3 apply.py` dry-run reviewed
+- [ ] If apply fails, see [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md)
 
 After primary apply (deferred user settings):
 
@@ -428,6 +432,7 @@ After manual capture:
 
 - [`README.md`](../README.md) — quick start, installation, workflow
 - [`VALIDATION_REPORT.md`](VALIDATION_REPORT.md) — post-discovery validation template
+- [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md) — apply failures and edge cases
 - [`manual_capture/README.md`](../manual_capture/README.md) — integrations, permissions, SSO capture
 - [VictorOps public API docs](https://portal.victorops.com/public/api-docs.html)
 - [Splunk On-Call SSO documentation](https://help.splunk.com/en/splunk-enterprise/alert-and-respond/splunk-on-call/introduction-to-splunk-on-call/single-sign-on)
