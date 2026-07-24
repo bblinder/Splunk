@@ -39,6 +39,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
+import requests
+
 from utils.env_loader import PROJECT_ROOT, load_dotenv
 from utils.http_client import BaseVictorOpsClient
 from utils.io import load_json
@@ -110,6 +112,22 @@ class ApplyClient(BaseVictorOpsClient):
         except ValueError:
             return {}, resp.status_code
 
+    def post_once(self, endpoint: str, payload: Dict[str, Any]) -> Tuple[Optional[Any], int]:
+        """POST without urllib3 retries so a single error response is logged."""
+        url = self._url(endpoint, self.base_v1)
+        self.rate_limiter.wait()
+        if self.dry_run:
+            log.info(f"DRY-RUN POST {url}")
+            return {"dry_run": True, "endpoint": endpoint, "payload": payload}, 200
+        resp = requests.post(url, json=payload, headers=dict(self.session.headers), timeout=30)
+        if resp.status_code not in (200, 201):
+            log.error(f"POST {url} -> {resp.status_code}: {resp.text}")
+            return None, resp.status_code
+        try:
+            return resp.json(), resp.status_code
+        except ValueError:
+            return {}, resp.status_code
+
 
 class ApplyPipeline:
     def __init__(
@@ -129,6 +147,7 @@ class ApplyPipeline:
         self.rtg_label_by_source_slug: Dict[str, str] = {}
         self.policy_team_map: Dict[str, str] = {}
         self.stats: Dict[str, Dict[str, int]] = {}
+        self.failures: Dict[str, List[str]] = {}
 
     def _load_json(self, name: str) -> Any:
         return load_json(self.inventory_dir / f"{name}.json")
@@ -136,6 +155,9 @@ class ApplyPipeline:
     def _bump(self, step: str, outcome: str) -> None:
         self.stats.setdefault(step, {"created": 0, "skipped": 0, "failed": 0, "warned": 0})
         self.stats[step][outcome] += 1
+
+    def _record_failure(self, step: str, detail: str) -> None:
+        self.failures.setdefault(step, []).append(detail)
 
     def run(self) -> Dict[str, Any]:
         self._index_policy_metadata()
@@ -165,6 +187,7 @@ class ApplyPipeline:
             "applied_at": datetime.now(timezone.utc).isoformat(),
             "dry_run": self.client.dry_run,
             "stats": self.stats,
+            "failures": self.failures,
             "slug_maps": {
                 "teams": self.team_slug_map,
                 "escalation_policies": self.policy_slug_map,
@@ -238,6 +261,10 @@ class ApplyPipeline:
             if post_succeeded(code, result):
                 self._bump("users", "created")
             else:
+                log.error(
+                    f"  FAILED user create: {source_username} -> {target_username} (HTTP {code})"
+                )
+                self._record_failure("users", f"{source_username}->{target_username}")
                 self._bump("users", "failed")
 
     def _list_teams(self) -> List[Dict[str, Any]]:
@@ -378,8 +405,9 @@ class ApplyPipeline:
         except ValueError:
             return 0
 
-    def _build_rotation_payload(self, rotation: Dict[str, Any]) -> Dict[str, Any]:
+    def _build_rotation_payload(self, rotation: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         shifts_out = []
+        rotation_label = rotation.get("label", "rotation")
         for shift in rotation.get("shifts", []):
             if not isinstance(shift, dict):
                 continue
@@ -390,6 +418,12 @@ class ApplyPipeline:
                 source_user = member.get("username")
                 if source_user and not self.remapping.is_skipped("users", source_user):
                     usernames.append(self.remapping.map_value("users", source_user))
+            if not usernames:
+                log.warning(
+                    f"  Skipping shift '{shift.get('label', 'shift')}' in rotation "
+                    f"'{rotation_label}': no remapped members after filtering skipped users."
+                )
+                continue
             shift_payload = {
                 "label": shift.get("label", "shift"),
                 "timezone": shift.get("timezone", "UTC"),
@@ -397,15 +431,19 @@ class ApplyPipeline:
                 "duration": min(int(shift.get("duration", 7)), 90),
                 "shifttype": shift.get("shifttype", "std"),
                 "mask": shift.get("mask", {}),
+                "usernames": usernames,
             }
             if shift.get("mask2"):
                 shift_payload["mask2"] = shift["mask2"]
             if shift.get("mask3"):
                 shift_payload["mask3"] = shift["mask3"]
-            if usernames:
-                shift_payload["usernames"] = usernames
             shifts_out.append(shift_payload)
-        return {"label": rotation.get("label", "rotation"), "shifts": shifts_out}
+        if not shifts_out:
+            log.warning(
+                f"  Skipping rotation '{rotation_label}': no valid shifts remain after filtering."
+            )
+            return None
+        return {"label": rotation_label, "shifts": shifts_out}
 
     def _refresh_rtg_map_for_team(self, source_team: str, target_team: str) -> None:
         data, status = self.client.get(f"teams/{target_team}/rotations", allow_404=True)
@@ -449,10 +487,17 @@ class ApplyPipeline:
                         self._refresh_rtg_map_for_team(source_team, target_team)
                         continue
                 body = self._build_rotation_payload(rotation)
-                result, code = self.client.post(f"teams/{target_team}/rotations", body)
+                if body is None:
+                    self._bump("rotations", "skipped")
+                    continue
+                result, code = self.client.post_once(f"teams/{target_team}/rotations", body)
                 if post_succeeded(code, result):
                     self._bump("rotations", "created")
                 else:
+                    log.error(
+                        f"  FAILED rotation '{label}' on team {target_team} (HTTP {code})"
+                    )
+                    self._record_failure("rotations", f"{label}@{target_team}")
                     self._bump("rotations", "failed")
             self._refresh_rtg_map_for_team(source_team, target_team)
 

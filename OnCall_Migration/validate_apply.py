@@ -287,10 +287,10 @@ class PreFlightValidator:
                         "which is missing from remapping.json."
                     )
                 elif mapped_users[username] is None:
-                    self.errors += 1
-                    log.error(
+                    self.warnings += 1
+                    log.warning(
                         f"[{label}] Team '{team_slug}' references user '{username}' "
-                        "which is marked to be SKIPPED."
+                        "which is marked to be SKIPPED (apply excludes them at runtime)."
                     )
 
     def _validate_alert_rules(self, remapping: Dict[str, Any]) -> None:

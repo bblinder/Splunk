@@ -184,3 +184,70 @@ Run `python3 apply_contact_methods_and_policies.py` (dry-run) after `apply.py --
 
 - {List any failed checks, missing files, or manual capture items still pending}
 
+---
+
+## SHS team workaround cleanup (avenhospitality)
+
+Record results after re-enabling SHS in remapping and re-running apply. Customer inventory for this migration lives under `inventory/avenhospitality/` (gitignored).
+
+### Code fixes applied
+
+| Change | File | Effect |
+| :--- | :--- | :--- |
+| Skipped users on active teams → warning | `validate_apply.py` | SHS team no longer blocked when departed users remain in inventory |
+| Skip empty shifts / rotation groups | `apply.py` | Avoids invalid rotation POST bodies (e.g. empty `SRE Distribution`) |
+| `post_once` for rotations | `apply.py` | Logs API error body once (no urllib3 500 retry storm) |
+| `failures` in apply report | `apply.py` | Lists failed usernames / rotations for post-mortem |
+
+### Remapping
+
+- Re-enable SHS: `"team-lMBqJ27I2vvYBR7o": "team-lMBqJ27I2vvYBR7o"` (not `null`)
+- Keep departed users skipped: `ramakrishna.bhat`, `andres.cifuentes` → `null`
+- Confirm `libu.george` → `libugeorge` exists on target before rotation apply: `GET /user/libugeorge`
+
+### Pre-flight (avenhospitality inventory)
+
+```bash
+python3 -m unittest discover -s tests -t . -q
+python3 validate_inventory.py --inventory inventory/avenhospitality
+python3 validate_apply.py --inventory inventory/avenhospitality --remapping inventory/avenhospitality/remapping.json
+python3 apply.py --inventory inventory/avenhospitality --remapping inventory/avenhospitality/remapping.json
+python3 apply_contact_methods_and_policies.py --inventory inventory/avenhospitality --remapping inventory/avenhospitality/remapping.json
+```
+
+Expect `validate_apply.py` **pass with warnings** for departed users on SHS. Dry-run should plan SHS members, **3 rotation groups** (skip empty `SRE Distribution`), **3 escalation policies**, and **3 routing keys**.
+
+### Live apply (requires TARGET = avenhospitality)
+
+Set `TARGET_SPLUNK_ONCALL_*` in `.env` to the **avenhospitality** org (not a dev sandbox). Then:
+
+```bash
+python3 apply.py --apply --inventory inventory/avenhospitality --remapping inventory/avenhospitality/remapping.json
+python3 apply_contact_methods_and_policies.py --apply --inventory inventory/avenhospitality --remapping inventory/avenhospitality/remapping.json
+python3 apply_contact_methods_and_policies.py --apply --inventory inventory/avenhospitality --remapping inventory/avenhospitality/remapping.json
+```
+
+Compare `inventory/avenhospitality/apply_report.json` to the prior run: `rotations.created` +3, `escalation_policies.created` +3, `routing_keys.created` +3 (failures → 0). Check `failures` for any remaining issues.
+
+### Failed user from prior primary apply
+
+Prior run: **39 users skipped, 1 failed, 0 created**. Only two mapped users had `verified: false` in source inventory:
+
+| Source user | Target user | Notes |
+| :--- | :--- | :--- |
+| `elbink.binil` | `elbink.binil-aven` | Unverified in source; on SHS team |
+| `aldona.rosemaria` | `aldona.rosemaria-aven` | Unverified in source; on SHS team |
+
+Re-run `apply.py --apply` and inspect logs for `FAILED user create` and `apply_report.json` → `failures.users`. Typical fixes: create user in target UI, fix email conflict in `remapping.emails`, or set `"username": null` if the user should not migrate.
+
+### Manual follow-ups (not covered by apply.py)
+
+| Item | Source | Action |
+| :--- | :--- | :--- |
+| Team admins (9 on SHS) | `team_admins_inventory.json` | Target UI — no public POST API |
+| Scheduled overrides (11 active) | `scheduled_overrides_inventory.json` | Recreate in target UI from inventory |
+| Push/mobile devices | `contact_methods_inventory.json` | Users re-login on target app |
+| Integrations / SSO | `manual_capture/` | Per `manual_capture/README.md` |
+
+---
+

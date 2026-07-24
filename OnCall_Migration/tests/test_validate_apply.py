@@ -115,9 +115,19 @@ class PreFlightValidatorTest(unittest.TestCase):
         self.remapping_file.write_text(json.dumps(remapping))
 
         validator = PreFlightValidator(self.inventory_dir, self.remapping_file)
-        validator.validate()
+        self.assertEqual(validator.validate(), 0)
         self.assertGreater(validator.warnings, 0)
-        self.assertGreater(validator.errors, 0)
+        self.assertEqual(validator.errors, 0)
+
+    def test_validate_warns_when_skipped_user_on_active_team(self) -> None:
+        remapping = json.loads(self.remapping_file.read_text())
+        remapping["users"]["bob"] = None
+        self.remapping_file.write_text(json.dumps(remapping))
+
+        validator = PreFlightValidator(self.inventory_dir, self.remapping_file)
+        self.assertEqual(validator.validate(), 0)
+        self.assertGreater(validator.warnings, 0)
+        self.assertEqual(validator.errors, 0)
 
     def test_validate_errors_when_user_missing_from_remapping(self) -> None:
         # A user whose email is not mapped and who is absent from remapping.users

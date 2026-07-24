@@ -350,6 +350,68 @@ class ApplyPipelineTest(unittest.TestCase):
         self.client.session.post.assert_not_called()
         self.assertEqual(self.pipeline.stats["alert_rules"]["skipped"], 1)
 
+    def test_rotation_skips_empty_shifts_and_groups(self) -> None:
+        rotations = {
+            "team-alpha": {
+                "rotations": [
+                    {
+                        "label": "Empty Group",
+                        "shifts": [],
+                    },
+                    {
+                        "label": "Filtered Shift",
+                        "shifts": [
+                            {
+                                "label": "Night",
+                                "timezone": "UTC",
+                                "start": "2020-01-01T00:00:00Z",
+                                "duration": 7,
+                                "shifttype": "std",
+                                "mask": {"day": {}, "time": []},
+                                "shiftMembers": [{"username": "departed"}],
+                            }
+                        ],
+                    },
+                ]
+            }
+        }
+        (self.inventory_dir / "rotation_definitions_inventory.json").write_text(json.dumps(rotations))
+        self.pipeline.remapping = RemappingContext(
+            {
+                "users": {"alice": "alice", "departed": None},
+                "emails": {"alice@example.com": "alice@target.example.com"},
+                "teams": {"team-alpha": "team-alpha"},
+                "routing_keys": {"ALPHA": "ALPHA"},
+                "escalation_policies": {"pol-alpha": "pol-alpha"},
+                "alert_rules": {"1": "1"},
+                "outbound_webhooks": {},
+            }
+        )
+        self.client.dry_run = False
+
+        def fake_get(url, timeout=30):
+            if "/rotations" in url:
+                return FakeResponse({"rotationGroups": []}, status_code=200)
+            if url.endswith("/team"):
+                return FakeResponse([{"name": "Alpha Team", "slug": "team-target"}], status_code=200)
+            return FakeResponse({}, status_code=404)
+
+        self.client.session.get = mock.MagicMock(side_effect=fake_get)
+        posted = []
+
+        def fake_post_once(url, json=None, timeout=30):
+            posted.append((url, json))
+            return FakeResponse({"rotationGroups": []}, status_code=200)
+
+        self.client.post_once = mock.MagicMock(side_effect=fake_post_once)
+
+        with mock.patch.object(self.client.rate_limiter, "wait"):
+            self.pipeline.team_slug_map["team-alpha"] = "team-target"
+            self.pipeline.apply_rotations()
+
+        self.client.post_once.assert_not_called()
+        self.assertEqual(self.pipeline.stats["rotations"]["skipped"], 2)
+
 
 class ApplyMainEnvTest(unittest.TestCase):
     def test_main_exits_when_target_env_missing(self) -> None:
