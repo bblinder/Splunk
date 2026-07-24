@@ -32,28 +32,26 @@ class DeferredMigrationClientTest(unittest.TestCase):
         self.client = DeferredMigrationClient("test-id", "test-key", "test-org", dry_run=False)
 
     @mock.patch.object(DeferredMigrationClient, "post")
-    def test_post_email_uses_correct_endpoint(self, mock_post) -> None:
-        self.client.post_email("alice", {"emailAddress": "test@example.com", "label": "Work"})
+    def test_post_email_uses_documented_payload(self, mock_post) -> None:
+        self.client.post_email("alice", {"email": "test@example.com", "label": "Work"})
         mock_post.assert_called_once_with(
             "user/alice/contact-methods/emails",
-            {"emailAddress": "test@example.com", "label": "Work"},
+            {"email": "test@example.com", "label": "Work"},
         )
 
     @mock.patch.object(DeferredMigrationClient, "post")
-    def test_post_phone_uses_correct_endpoint(self, mock_post) -> None:
-        self.client.post_phone("bob", {"phoneNumber": "123-456-7890", "label": "Phone"})
+    def test_post_phone_uses_documented_payload(self, mock_post) -> None:
+        self.client.post_phone("bob", {"phone": "+1 555-0100", "label": "Phone"})
         mock_post.assert_called_once_with(
             "user/bob/contact-methods/phones",
-            {"phoneNumber": "123-456-7890", "label": "Phone"},
+            {"phone": "+1 555-0100", "label": "Phone"},
         )
 
     @mock.patch.object(DeferredMigrationClient, "post")
-    def test_post_paging_policy_step_uses_correct_endpoint(self, mock_post) -> None:
-        self.client.post_paging_policy_step("bob", {"timeout": 5, "contactType": "email"})
-        mock_post.assert_called_once_with(
-            "user/bob/policies/primary/steps",
-            {"timeout": 5, "contactType": "email"},
-        )
+    def test_post_paging_policy_step_uses_profile_endpoint(self, mock_post) -> None:
+        payload = {"timeout": 5, "rules": [{"type": "push"}]}
+        self.client.post_paging_policy_step("bob", payload)
+        mock_post.assert_called_once_with("profile/bob/policies", payload)
 
 
 class DeferredPipelineTest(unittest.TestCase):
@@ -116,7 +114,7 @@ class DeferredPipelineTest(unittest.TestCase):
                     "emails": {
                         "contactMethods": [{"value": "alice@source.com", "label": "Work"}]
                     },
-                    "phones": {"contactMethods": [{"value": "555", "label": "Cell"}]},
+                    "phones": {"contactMethods": [{"value": "+1 555-0100", "label": "Cell"}]},
                     "devices": {"contactMethods": [{"value": "device-token"}]},
                 }
             },
@@ -131,11 +129,11 @@ class DeferredPipelineTest(unittest.TestCase):
         self.assertEqual(mock_post.call_count, 2)
         mock_post.assert_any_call(
             "user/alice-target/contact-methods/emails",
-            {"emailAddress": "alice@target.com", "label": "Work"},
+            {"email": "alice@target.com", "label": "Work"},
         )
         mock_post.assert_any_call(
             "user/alice-target/contact-methods/phones",
-            {"phoneNumber": "555", "label": "Cell"},
+            {"phone": "+1 555-0100", "label": "Cell"},
         )
         self.assertEqual(self.pipeline.stats["emails"]["created"], 1)
         self.assertEqual(self.pipeline.stats["phones"]["created"], 1)
@@ -155,7 +153,7 @@ class DeferredPipelineTest(unittest.TestCase):
         mock_post.assert_not_called()
         self.assertEqual(self.pipeline.stats["users"]["skipped"], 1)
 
-    def test_paging_policy_warns_on_push_contact_type(self) -> None:
+    def test_paging_policy_posts_profile_payload(self) -> None:
         self._write_inventory(
             contact_methods={
                 "bob": {
@@ -168,59 +166,59 @@ class DeferredPipelineTest(unittest.TestCase):
         self.client.dry_run = False
 
         with mock.patch.object(self.client, "get", return_value=(None, 404)):
-            with mock.patch.object(self.client, "post", return_value=(None, 400)) as mock_post:
+            with mock.patch.object(self.client, "post", return_value=({}, 200)) as mock_post:
                 with mock.patch.object(self.client.rate_limiter, "wait"):
                     self.pipeline.run()
 
         mock_post.assert_called_once_with(
-            "user/bob-suffix/policies/primary/steps",
-            {"timeout": 5, "contactType": "push"},
+            "profile/bob-suffix/policies",
+            {"timeout": 5, "rules": [{"type": "push"}]},
         )
-        self.assertEqual(self.pipeline.stats["paging_steps"]["warned"], 1)
-        self.assertEqual(self.pipeline.stats["paging_steps"].get("failed", 0), 0)
+        self.assertEqual(self.pipeline.stats["paging_steps"]["created"], 1)
 
-    def test_non_push_paging_step_failure_counts_as_failed(self) -> None:
+    def test_email_paging_step_includes_contact_id(self) -> None:
         self._write_inventory(
             contact_methods={
                 "bob": {
-                    "emails": {"contactMethods": []},
+                    "emails": {
+                        "contactMethods": [{"value": "bob@example.com", "label": "Work"}]
+                    },
                     "phones": {"contactMethods": []},
                 }
             },
             paging_policies={"bob": [{"order": 1, "timeout": 3, "contactType": "email"}]},
         )
+        self.pipeline.remapping = RemappingContext(
+            {
+                "users": {"bob": "bob-suffix"},
+                "emails": {"bob@example.com": "bob@target.com"},
+            }
+        )
         self.client.dry_run = False
 
-        with mock.patch.object(self.client, "get", return_value=(None, 404)):
-            with mock.patch.object(self.client, "post", return_value=(None, 400)):
+        def fake_get(endpoint):
+            if endpoint.endswith("/contact-methods/emails"):
+                return (
+                    {
+                        "contactMethods": [
+                            {"id": 99, "value": "bob@target.com", "contactType": "Email"}
+                        ]
+                    },
+                    200,
+                )
+            if endpoint.endswith("/profile/bob-suffix/policies"):
+                return ({"steps": []}, 200)
+            return (None, 404)
+
+        with mock.patch.object(self.client, "get", side_effect=fake_get):
+            with mock.patch.object(self.client, "post", return_value=({}, 200)) as mock_post:
                 with mock.patch.object(self.client.rate_limiter, "wait"):
                     self.pipeline.run()
 
-        self.assertEqual(self.pipeline.stats["paging_steps"]["failed"], 1)
-        self.assertEqual(self.pipeline.stats["paging_steps"].get("warned", 0), 0)
-
-    def test_push_step_failure_logs_warning_and_continues(self) -> None:
-        self._write_inventory(
-            contact_methods={
-                "alice": {
-                    "emails": {"contactMethods": []},
-                    "phones": {"contactMethods": []},
-                }
-            },
-            paging_policies={"alice": [{"order": 1, "timeout": 5, "contactType": "push"}]},
+        mock_post.assert_any_call(
+            "profile/bob-suffix/policies",
+            {"timeout": 3, "rules": [{"type": "email", "contact": {"id": 99, "type": "email"}}]},
         )
-        self.client.dry_run = False
-        self.client.session.get = mock.MagicMock(return_value=FakeResponse(None, status_code=404))
-        self.client.session.post = mock.MagicMock(
-            return_value=FakeResponse({"error": "no device"}, status_code=400)
-        )
-        with mock.patch.object(self.client.rate_limiter, "wait"):
-            with self.assertLogs("apply_contact_methods_and_policies", level="WARNING") as captured:
-                self.pipeline.run()
-        self.assertTrue(
-            any("Expected failure for push contactType" in message for message in captured.output)
-        )
-        self.assertEqual(self.pipeline.stats["paging_steps"]["warned"], 1)
 
     def test_email_skipped_when_already_present_on_target(self) -> None:
         self._write_inventory(
@@ -238,7 +236,7 @@ class DeferredPipelineTest(unittest.TestCase):
 
         def fake_get(endpoint):
             if endpoint.endswith("/contact-methods/emails"):
-                return ({"contactMethods": [{"emailAddress": "alice@target.example.com"}]}, 200)
+                return ({"contactMethods": [{"value": "alice@target.example.com"}]}, 200)
             return (None, 404)
 
         with mock.patch.object(self.client, "get", side_effect=fake_get):
@@ -252,11 +250,9 @@ class DeferredPipelineTest(unittest.TestCase):
         self.assertEqual(self.pipeline.stats["emails"]["skipped"], 1)
 
     def test_paging_only_user_processed(self) -> None:
-        # User present only in paging_policies (absent from contact_methods) must
-        # still have paging steps applied.
         self._write_inventory(
             contact_methods={},
-            paging_policies={"bob": [{"order": 1, "timeout": 3, "contactType": "email"}]},
+            paging_policies={"bob": [{"order": 1, "timeout": 3, "contactType": "push"}]},
         )
         self.client.dry_run = False
         with mock.patch.object(self.client, "get", return_value=(None, 404)):
@@ -264,36 +260,26 @@ class DeferredPipelineTest(unittest.TestCase):
                 with mock.patch.object(self.client.rate_limiter, "wait"):
                     self.pipeline.run()
         mock_post.assert_called_once_with(
-            "user/bob-suffix/policies/primary/steps",
-            {"timeout": 3, "contactType": "email"},
+            "profile/bob-suffix/policies",
+            {"timeout": 3, "rules": [{"type": "push"}]},
         )
         self.assertEqual(self.pipeline.stats["paging_steps"]["created"], 1)
 
-    def test_paging_steps_parsed_from_dict_wrapper(self) -> None:
+    def test_invalid_paging_inventory_exits(self) -> None:
         self._write_inventory(
-            contact_methods={
-                "bob": {
-                    "emails": {"contactMethods": []},
-                    "phones": {"contactMethods": []},
-                }
-            },
-            paging_policies={
-                "bob": {
-                    "primary": {
-                        "steps": [{"order": 1, "timeout": 2, "contactType": "email"}]
-                    }
-                }
-            },
+            contact_methods={},
+            paging_policies={"bob": {"steps": [{"timeout": 3, "contactType": "email"}]}},
         )
-        self.client.dry_run = False
-        with mock.patch.object(self.client, "get", return_value=(None, 404)):
-            with mock.patch.object(self.client, "post", return_value=({}, 200)) as mock_post:
-                with mock.patch.object(self.client.rate_limiter, "wait"):
-                    self.pipeline.run()
-        mock_post.assert_called_once_with(
-            "user/bob-suffix/policies/primary/steps",
-            {"timeout": 2, "contactType": "email"},
+        with self.assertRaises(SystemExit):
+            self.pipeline.run()
+
+    def test_build_paging_payload_requires_email_contact(self) -> None:
+        payload = DeferredPipeline._build_paging_payload(
+            {"timeout": 5, "contactType": "email"},
+            [],
+            [],
         )
+        self.assertIsNone(payload)
 
 
 class DeferredMainTest(unittest.TestCase):

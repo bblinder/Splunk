@@ -37,7 +37,7 @@ Terraform was evaluated and rejected for the apply step: the `splunk/victorops` 
 
 - **Dry run first:** `python3 apply.py` (no `--apply`) simulates the migration and writes `inventory/apply_report.json` without changing the target org. Review that report before you run with `--apply`. After primary apply, run `python3 apply_contact_methods_and_policies.py` (dry-run default) before `--apply` for contact methods and paging policies — the deferred script logs planned POSTs but does not write a separate report file.
 - **Escalation policies cannot be edited later:** Once created in the target org, policy steps and routing cannot be changed through the API. Double-check `inventory/remapping.json` and run `python3 validate_apply.py` before applying.
-- **Re-running apply:** A second run is mostly safe for resources that already exist — users, teams, members, rotations, and escalation policies are skipped when found. Routing keys and alert rules are posted again and may fail or duplicate if they already exist. A policy created with wrong steps cannot be fixed by re-applying; fix it in the target UI or delete and recreate the policy manually, then adjust remapping if needed. Re-running `apply_contact_methods_and_policies.py --apply` does **not** skip existing contact methods or paging steps — dry-run first to avoid duplicates.
+- **Re-running apply:** A second run is mostly safe for resources that already exist — users, teams, members, rotations, and escalation policies are skipped when found. Routing keys and alert rules are posted again and may fail or duplicate if they already exist. A policy created with wrong steps cannot be fixed by re-applying; fix it in the target UI or delete and recreate the policy manually, then adjust remapping if needed. Re-running `apply_contact_methods_and_policies.py --apply` skips existing emails, phones, and matching paging steps via GET preflight; duplicate contact POSTs otherwise return HTTP 500 from the API.
 - **Overwrites:** Re-running `generate_remapping.py` overwrites `inventory/remapping.json`. Back up manual edits first.
 
 ### Scope
@@ -374,18 +374,18 @@ python3 apply_contact_methods_and_policies.py --apply       # execute writes
 
 | Step | API | Notes |
 | :--- | :--- | :--- |
-| Email contact methods | `POST /user/{username}/contact-methods/emails` | Remap `value` via `remapping.emails`; skip `null` |
-| Phone contact methods | `POST /user/{username}/contact-methods/phones` | Phone numbers posted as-is |
+| Email contact methods | `POST /user/{username}/contact-methods/emails` | Inventory `value` → POST body `email`; remap via `remapping.emails`; skip `null` |
+| Phone contact methods | `POST /user/{username}/contact-methods/phones` | Inventory `value` → POST body `phone`; posted as-is |
 | Push devices | — | **Not migrated** — requires user login on target |
-| Paging policy steps | `POST /user/{username}/policies/primary/steps` | Posts `timeout` + `contactType`; push steps typically fail until devices are registered |
+| Paging policy steps | `POST /profile/{username}/policies` | Maps inventory `{timeout, contactType}` → `{timeout, rules: [{type, contact?}]}`; email/phone rules require matching contact methods on the target user first |
 
-Push notification steps (`contactType: push`) are expected to fail when no push device exists on the target user. The script logs a warning and continues.
+Apply contact methods before paging steps for the same user. Email and phone paging rules reference contact IDs from the target user's contact methods. Push rules use `{type: "push"}` only.
 
-The script iterates users from `contact_methods_inventory.json`; paging steps for each user come from the matching entry in `paging_policies_inventory.json`.
+The script iterates the union of users in `contact_methods_inventory.json` and `paging_policies_inventory.json`.
 
 ### Re-running deferred apply
 
-Unlike primary apply, the deferred script has **no duplicate detection**. Re-running `--apply` posts emails, phones, and paging steps again and may fail or create duplicates. Dry-run first and remove conflicting contact methods in the target UI before repeating.
+On `--apply`, the script GETs existing contact methods and profile paging steps before POSTing. Matching emails, phones, and `(timeout, contactType)` paging steps are **skipped**. Duplicate POSTs for the same email or phone return HTTP 500 from the API, so the GET preflight is required for safe re-runs. Paging steps can still duplicate if the signature differs (for example, same `contactType` with a different `timeout`). Dry-run simulates POSTs only and does not query the target org.
 
 ---
 

@@ -168,7 +168,7 @@ Alert rules with `alertField: routing_key` may match pattern values not exported
 
 Run `python3 apply_contact_methods_and_policies.py` (dry-run) after `apply.py --apply` has created users in the target org. The script applies email/phone contact methods from `contact_methods_inventory.json` and primary paging steps from `paging_policies_inventory.json`, using the same `remapping.json` for username and email translation. Push devices are not migrated via API; push paging steps may warn until users log in on the target.
 
-**Re-run warning:** Unlike primary apply, the deferred script does not skip existing contact methods or paging steps. A second `--apply` may duplicate emails/phones or fail on conflicts — dry-run first and clean up the target UI before repeating.
+**Re-run warning:** On `--apply`, the deferred script skips emails, phones, and matching paging steps already present on the target user (GET preflight). Duplicate contact POSTs return HTTP 500 from the API. Dry-run does not query the target org.
 
 ---
 
