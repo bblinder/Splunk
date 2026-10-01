@@ -22,11 +22,13 @@ class HealthCheck:
         """Check if there's sufficient disk space using standard lib shutil"""
         try:
             total, used, free = shutil.disk_usage("/")
-            free_gb = free // (2**30)  # Convert bytes to GB
-            return free_gb >= min_space_gb
+            free_gb = free // (2**30)
+            status = free_gb >= min_space_gb
+            msg = f"{free_gb:.2f} GB free (Minimum required: {min_space_gb} GB)"
+            return status, msg
         except Exception as e:
             self.logger.error(f"Error checking disk space: {e}")
-            return False
+            return False, "Error checking disk space"
 
     def _check_network(self) -> bool:
         """Basic network connectivity check using standard socket library"""
